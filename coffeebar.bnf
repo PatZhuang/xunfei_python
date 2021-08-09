@@ -1,0 +1,24 @@
+#BNF+IAT 1.0 UTF-8;
+!grammar coffeebar;
+!slot <want>;
+!slot <cups>;
+!slot <coffeetype>;
+!slot <action>;
+!slot <tableID>;
+!slot <wantgopre>;
+!slot <wantgosuf>;
+
+!start <coffeebarstart>;
+<coffeebarstart>:<order>|<guide>;
+<order>:[<want>]<cups><coffeetype>[<action>]<tableID>|[<want>]<coffeetype><cups>[<action>]<tableID>|<tableID><cups><coffeetype>|<tableID><coffeetype><cups>;
+<guide>:<wantgopre><tableID>;
+
+<want>:我想要|我要|给我|请给我|我需要|帮我点|点|下单;
+<cups>:一杯!id(90001)|两杯!id(90002);
+<coffeetype>:意式|美式|意式咖啡|美式咖啡|普通咖啡;
+<action>:给|送到|到;
+<tableID>:一号桌!id(10001)|二号桌!id(10002)|三号桌!id(10003)|四号桌!id(10004)|五号桌!id(10005)|六号桌!id(10006)|七号桌!id(10007)|八号桌!id(10008)|九号桌!id(10009);
+
+
+<wantgopre>:我想去|我要去|带我去|带我到;
+<wantgosuf>:怎么去|怎么走|在哪里|在哪|是哪一个|是哪个|是哪里|是哪一张;
