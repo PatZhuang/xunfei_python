@@ -178,7 +178,7 @@ class QISR(object):
         update_lex_params = "engine_type=local, text_encoding=UTF-8,\
             asr_res_path={}, sample_rate={},\
             grm_build_path={}, grammar_list={}".format(
-                self.asr_res_path, SAMPLE_RATE_16K, self.grm_build_path, self.asr_data.grammar_id
+                self.asr_res_path, SAMPLE_RATE_16K, self.grm_build_path, self.asr_data.grammar_id.decode('utf8')
             )
         lex_name = bytes(lex_name, encoding='utf8')
         lex_content = bytes(lex_content, encoding='utf8')
@@ -221,13 +221,15 @@ class QISR(object):
         rec_status = c_int(MSP_REC_STATUS_INCOMPLETE)
         rss_status = c_int(MSP_REC_STATUS_INCOMPLETE)
         
+        total_audio_data = b''
         while True:
             if 0 == audio_clip_cnt:
                 audio_status = MSP_AUDIO_SAMPLE_FIRST
             else:
                 audio_status = MSP_AUDIO_SAMPLE_CONTINUE
                 
-            audio_data = self.recorder.get_record_audio(duration=0.2)
+            audio_data = self.recorder.get_record_audio(duration=200)
+            total_audio_data += audio_data
             audio_len = len(audio_data)
             
             self.AudioWrite(self.sessionID_local, audio_data, audio_len, audio_status, ep_status, rec_status)
@@ -236,6 +238,8 @@ class QISR(object):
         self.AudioWrite(self.sessionID_local, c_void_p(), 0, MSP_AUDIO_SAMPLE_LAST, ep_status, rec_status)
         self.GetResult(self.sessionID_local, result_type=result_type)
         self.SessionEnd(self.sessionID_local, hints="Done recognizing")
+        
+        return total_audio_data
         
             
 if __name__ == '__main__':
