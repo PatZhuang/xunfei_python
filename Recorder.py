@@ -29,7 +29,7 @@ class Recorder(object):
         if self.istream.stopped:
             self.istream.start()
             while not self.istream.active:
-            print("* start recording")
+                print("* start recording")
         
     def stop(self):
         if self.istream.active:
