@@ -26,14 +26,20 @@ class Recorder(object):
         self.start()
     
     def start(self):
-        while self.istream.stopped:
+        if self.istream.stopped:
             self.istream.start()
-            time.sleep(0.1)
-        print("* start recording")
+            while not self.istream.active:
+            print("* start recording")
         
     def stop(self):
-        self.istream.stop()
-        print("* stop recording")
+        if self.istream.active:
+            self.istream.stop()
+            print("* stop recording")
+        
+    def abort(self):
+        if self.istream.active:
+            self.istream.abort()
+            print('* abort recording')
         
     def get_record_audio(self, duration=1000):
         """获取固定时长的输入音频
@@ -44,7 +50,7 @@ class Recorder(object):
         Returns:
             bytes: raw 格式的输入音频
         """
-        while self.istream.stopped:
+        if self.istream.stopped:
             self.start()
             
         length = duration // 1000 * self.sample_rate
@@ -52,7 +58,7 @@ class Recorder(object):
         for _ in range(0, max(int(length / self.chunk), 1)):
             data, overflowed = self.istream.read(self.chunk)
             frames.append(data)
-        
+
         return b''.join(frames)
     
     def get_record_audio_with_len(self, frame_len):
@@ -65,7 +71,11 @@ class Recorder(object):
             bytes: raw 格式的输入音频
         """
         # 因为采样率是 16bit，所以返回的长度其实是 frame_len * 2
-        return self.istream.read(frame_len)[0]
+        if self.istream.stopped:
+            self.start()
+        frames, overflowed = self.istream.read(frame_len)
+        
+        return frames
     
     def get_record_audio_with_vad(self, duration=10000, vad_bos=5000, vad_eos=2000, aggressiveness=3, filter_blank=True): 
         """获取音频，使用 vad 自动判断停止输入并截断
@@ -79,6 +89,8 @@ class Recorder(object):
         Returns:
             (bytes, bool): (raw 格式的输入音频, 是否有输入音频)
         """
+        if self.istream.stopped:
+            self.start()
         vad = webrtcvad.Vad(aggressiveness)
         bos_cnt = 0
         eos_cnt = 0
@@ -114,7 +126,7 @@ class Recorder(object):
                         suf_blank_len *= 2
                     frames = frames[pre_blank_len:-suf_blank_len]
                 break
-            
+        self.istream.abort()
         return frames, has_spoken
     
     def play_file(self, filename):
@@ -171,5 +183,5 @@ class Recorder(object):
 
 if __name__ == '__main__':
     r = Recorder()
-    r.get_record_audio_with_vad(duration=10000)
-    print(r)
+    frames, has_spoken = r.get_record_audio_with_vad(duration=10000)
+    print(len(frames))
