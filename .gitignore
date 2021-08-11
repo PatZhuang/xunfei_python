@@ -2,3 +2,6 @@ msc/
 __pycache__/
 test.py
 msc
+AIUI_CMN.py
+call.bnf
+AIUI/
