@@ -1,25 +1,77 @@
 from QIVW import QIVW
 from QTTS import QTTS
+from AIUI_webapi import AIUIAgent
 from ctypes import *
-from StatusCode import *
+from MSP_CMN import *
 from Recorder import Recorder
+import json
+
+
+def order(slots):
+    print(slots)
+
 
 if __name__ == '__main__':
-    msc_load_library = "../sdk/libs/x64/libmsc.so"
-    dll = cdll.LoadLibrary(msc_load_library)
-    
-    app_id = 'a1500789'
-    loginParams = "appid={}".format(app_id)
-    loginParams = bytes(loginParams, encoding="utf8")
-    ret = dll.MSPLogin(None, None, loginParams)
-    if MSP_SUCCESS != ret:
-        print("MSPLogin failed, error code is: %d", ret)
+    msp_cmn = MSP_CMN()
+    msp_cmn.Login()
     
     recorder = Recorder()
-    vw = QIVW(dll, recorder)
-    tts = QTTS(dll, recorder)
+    ivw = QIVW(msp_cmn.dll, recorder)
+    tts = QTTS(msp_cmn.dll, recorder)
+    aiui_agent = AIUIAgent()
+    
     while True:
-        if vw.wakeup():
-            tts.debug()
+        print('ready to be waken up')
+        semantic = []
+        if ivw.wakeup():
+            tts.say()
+            print('done greeting.')
+            service = None
+            while True:
+                recorder.abort()
+                total_audio_data, has_spoken = recorder.get_record_audio_with_vad()
+        
+                if total_audio_data != b'': # 输入音频不为空
+                    ret = aiui_agent.sendMessage(data_type="audio", data=total_audio_data)
+                    ret_data = json.loads(ret.content)['data']
+                    try:
+                        nlp_res = list(filter(lambda x:x['sub'] == 'nlp', ret_data))[0]
+                        answer = nlp_res['intent']['answer']['text']
+                        service = nlp_res['intent']['service'].split('.')[-1]
+                        if service == 'peanut_daily' and not nlp_res['intent']['shouldEndSession']:
+                            semantic = nlp_res['intent']['semantic']
+                            # print(semantic[0]['slots'])
+                    except:
+                        if service == 'peanut_daily':   # 如果识别出错但是处于点餐阶段，默认回复是的
+                            ret = aiui_agent.sendMessage(data_type="text", data="是的")
+                            ret_data = json.loads(ret.content)['data']
+                            nlp_res = list(filter(lambda x:x['sub'] == 'nlp', ret_data))[0]
+                            answer = nlp_res['intent']['answer']['text']
+                            service = None
+                            order(semantic[0]['slots'])
+                        else:
+                            service = None
+                            answer = "我没有听懂，可以请您再说一遍吗？"
+                            print(ret_data)
+                    finally:
+                        # print(ret_data)
+                        print(answer)
+                else:
+                    if service == 'peanut_daily':
+                        # 如果没有输入音频但是处于点餐阶段，默认回复是的
+                        ret = aiui_agent.sendMessage(data_type="text", data="是的")
+                        ret_data = json.loads(ret.content)['data']
+                        nlp_res = list(filter(lambda x:x['sub'] == 'nlp', ret_data))[0]
+                        answer = nlp_res['intent']['answer']['text']
+                        service = None
+                        order(semantic[0]['slots'])
+                    else:
+                        print('no audio input')
+                        break
+                
+                tts.say(answer)
+                
+            print('end session')
+            
             
         
