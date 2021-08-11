@@ -36,8 +36,10 @@ class AIUIAgent(object):
         self.sample_rate = SAMPLE_RATE
         self.lat = LAT
         self.lng = LNG
+        
+        print('AIUI webapi agent initialized.')
 
-    def buildHeader(self, data_type, result_level='complete', pers_param=None):
+    def buildHeader(self, data_type, result_level='plain', pers_param=None):
         curTime = str(int(time.time()))
         param = {
             "result_level": result_level,
@@ -46,7 +48,8 @@ class AIUIAgent(object):
             "sample_rate": self.sample_rate,
             "scene": self.scene,
             "lat": self.lat,
-            "lng": self.lng
+            "lng": self.lng,
+            "interact_mode": "oneshot"
         }
         if pers_param is not None:
             param["pers_param"] = pers_param
@@ -71,14 +74,16 @@ class AIUIAgent(object):
         return data
     
     def sendMessage(self, data_type, data):
+        if data_type == 'text':
+            data = data.encode('utf8')
         return requests.post(URL, headers=self.buildHeader(data_type=data_type), data=data)
 
 
 if __name__ == '__main__':
-    recorder = Recorder()
-    total_audio_data, has_spoken = recorder.get_record_audio_with_vad()
-    
     aiui_agent = AIUIAgent()
+    recorder = Recorder()
+    total_audio_data, has_spoken = recorder.get_record_audio_with_vad(filter_blank=True)
+    
     if total_audio_data != b'':
         start = time.time()
         ret = aiui_agent.sendMessage(data_type="audio", data=total_audio_data)

@@ -114,6 +114,20 @@ class QTTS(object):
             self.SessionEnd()
         except (RuntimeError, ValueError) as e:
             traceback.print_exc()
+            
+    def say(self, textString=None, block=True):
+        try:
+            self.SessionBegin()
+            self.TextPut(textString)
+            if block:   # 阻塞交互，半双工
+                self.recorder.abort()
+                audio = self.AudioGet()
+                self.recorder.play_buffer(audio)
+            else:
+                pass    
+            self.SessionEnd()
+        except (RuntimeError, ValueError) as e:
+            traceback.print_exc()
         
     
     def __del__(self):

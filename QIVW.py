@@ -73,7 +73,6 @@ class QIVW(object):
             raise RuntimeError("QIVWAudioWrite failed, errCode: %d", ret)
         
     def SessionEnd(self):
-        self.recorder.stop()
         hints = "Done wakeup"
         hints = bytes(hints, encoding="utf8")
         ret = self.dll.QIVWSessionEnd(self.sessionID, hints)
@@ -92,6 +91,7 @@ class QIVW(object):
                 audioLen = len(audioData)
                 self.AudioWrite(audioData, audioLen)
             self.awoken = False
+            
             self.SessionEnd()
             return True
         except RuntimeError as e:
