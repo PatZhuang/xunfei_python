@@ -7,17 +7,17 @@ import time
 
 class Recorder(object):
     
-    def __init__(self, dtype='int16', channels=1, samplerate=16000, chunk=1024) -> None:
+    def __init__(self, dtype='int16', channels=1, sample_rate=16000, chunk=1024) -> None:
         super().__init__()
         
         self.dtype = dtype
         self.channels = channels
-        self.samplerate = samplerate
+        self.sample_rate = sample_rate
         self.chunk = chunk
         
         self.play_event = threading.Event()
         
-        self.istream = sd.RawInputStream(samplerate=self.samplerate, 
+        self.istream = sd.RawInputStream(samplerate=self.sample_rate, 
                                          blocksize=self.chunk,
                                          dtype=self.dtype,
                                          channels=self.channels,
@@ -47,7 +47,7 @@ class Recorder(object):
         while self.istream.stopped:
             self.start()
             
-        length = duration // 1000 * self.samplerate
+        length = duration // 1000 * self.sample_rate
         frames = []
         for _ in range(0, max(int(length / self.chunk), 1)):
             data, overflowed = self.istream.read(self.chunk)
@@ -88,10 +88,10 @@ class Recorder(object):
         
         for i in range(duration // frame_duration):
             time.sleep(0.02)
-            frame = self.get_record_audio_with_len(frame_len=self.samplerate // 1000 * frame_duration)
+            frame = self.get_record_audio_with_len(frame_len=self.sample_rate // 1000 * frame_duration)
             
             frames += frame
-            if vad.is_speech(frame, self.samplerate):
+            if vad.is_speech(frame, self.sample_rate):
                 has_spoken = True
                 eos_cnt = 0
             else:
@@ -107,8 +107,8 @@ class Recorder(object):
                 # 如果是句尾空白停止，停止录音并返回
                 if filter_blank:
                     # 过滤句首句尾空白
-                    pre_blank_len = bos_cnt * self.samplerate // 1000
-                    suf_blank_len = vad_eos * self.samplerate // 1000
+                    pre_blank_len = bos_cnt * self.sample_rate // 1000
+                    suf_blank_len = vad_eos * self.sample_rate // 1000
                     if self.dtype == 'int16':
                         pre_blank_len *= 2
                         suf_blank_len *= 2
@@ -154,7 +154,7 @@ class Recorder(object):
                 raise sd.CallbackStop()
             current_frame += chunksize
         
-        ostream = sd.RawOutputStream(samplerate=self.samplerate, blocksize=self.chunk, 
+        ostream = sd.RawOutputStream(samplerate=self.sample_rate, blocksize=self.chunk, 
                                      channels=self.channels, dtype=self.dtype,
                                     callback=play_buffer_callback, finished_callback=event.set)
         with ostream:
@@ -171,4 +171,5 @@ class Recorder(object):
 
 if __name__ == '__main__':
     r = Recorder()
-    r.get_record_audio_with_vad(duration=5000)
+    r.get_record_audio_with_vad(duration=10000)
+    print(r)
