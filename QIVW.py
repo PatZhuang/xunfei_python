@@ -4,6 +4,7 @@ from MSP_TYPES import *
 from rich import print
 import traceback
 from utils import *
+from MSP_CMN import MSP_CMN
 
 class QIVW(object):
     def __init__(self, dll: CDLL, recorder: Recorder) -> None:
@@ -111,16 +112,9 @@ class QIVW(object):
             
 
 if __name__ == '__main__':
-    msc_load_library = "../sdk/libs/x64/libmsc.so"
-    dll = cdll.LoadLibrary(msc_load_library)
-    
-    app_id = 'a1500789'
-    loginParams = "appid={}".format(app_id)
-    loginParams = bytes(loginParams, encoding="utf8")
-    ret = dll.MSPLogin(None, None, loginParams)
-    if MSP_SUCCESS != ret:
-        print("MSPLogin failed, error code: %d", ret)
+    msp_cmn = MSP_CMN()
+    msp_cmn.Login()
     
     recorder = Recorder()
-    vw = QIVW(dll, recorder)
+    vw = QIVW(msp_cmn.dll, recorder)
     vw.debug()

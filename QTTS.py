@@ -5,6 +5,7 @@ from MSP_TYPES import *
 from rich import print
 import traceback
 from utils import *
+from MSP_CMN import MSP_CMN
 
 
 class QTTS(object):
@@ -57,7 +58,7 @@ class QTTS(object):
 
     def TextPut(self, textString=None):
         if textString is None:
-            textString = "欢迎来到新氦咖啡吧，我是迎宾机器人花生。"
+            textString = "您好，我是迎宾机器人花生，请问您有什么需要？"
         textString = bytes(textString, encoding='utf8')
         textLen = self.dll.strlen(textString)
         ret = self.dll.QTTSTextPut(self.sessionID, textString, textLen, None)
@@ -113,7 +114,7 @@ class QTTS(object):
             self.SessionEnd()
         except (RuntimeError, ValueError) as e:
             traceback.print_exc()
-        # print(self.sessionID)
+        
     
     def __del__(self):
         if self._session_avail:
@@ -123,16 +124,9 @@ class QTTS(object):
                 traceback.print_exc()  
 
 if __name__ == '__main__':
-    msc_load_library = "../sdk/libs/x64/libmsc.so"
-    dll = cdll.LoadLibrary(msc_load_library)
-    
-    app_id = 'a1500789'
-    loginParams = "appid={}".format(app_id)
-    loginParams = bytes(loginParams, encoding="utf8")
-    ret = dll.MSPLogin(None, None, loginParams)
-    if MSP_SUCCESS != ret:
-        print("MSPLogin failed, error code: %d", ret)
+    msp_cmn = MSP_CMN()
+    msp_cmn.Login()
     
     recorder = Recorder()
-    tts = QTTS(dll, recorder)
+    tts = QTTS(msp_cmn.dll, recorder)
     tts.debug()
