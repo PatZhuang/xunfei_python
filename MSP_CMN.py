@@ -1,5 +1,5 @@
 from ctypes import *
-from utils import read_pointer
+from utils import read_charp_with_len
 from MSP_TYPES import *
 import json
 from rich import print
@@ -32,7 +32,6 @@ class MSP_CMN(object):
         ret = self.dll.MSPLogin(None, None, loginParams)
         if MSP_SUCCESS != ret:
             raise RuntimeError("MSPLogin failed, error code is: %d", ret)
-        return ret
     
     def UploadData(self, data_name, data, params):
         # NOT TESTED.
@@ -47,14 +46,13 @@ class MSP_CMN(object):
         ret = self.dll.MSPUploadData(data_name, data, data_len, params, byref(error_code))
         if MSP_SUCCESS != error_code.value:
             raise RuntimeError('MSPUploadData failed. error code: %d' % error_code.value)
-        return error_code.value, ret
+        return ret
         
     
     def Logout(self):
         ret = self.dll.MSPLogout()
         if MSP_SUCCESS != ret:
             raise RuntimeError("MSPLogout failed, error code is: %d", ret)
-        return ret
     
     def SetParam(self, params_name, params_value):
         if type(params_name) is not bytes:
@@ -64,7 +62,6 @@ class MSP_CMN(object):
         ret = self.dll.MSPSetParam(params_name, params_value)
         if MSP_SUCCESS != ret:
             raise RuntimeError("MSPSetParam failed, error code: %d" % ret)
-        return ret
             
     def GetParam(self, param_name):
         # NOT WORKING!!!
@@ -77,7 +74,7 @@ class MSP_CMN(object):
         ret = self.dll.MSPGetParam(param_name, param_value, byref(param_len))
         if MSP_SUCCESS != ret:
             raise RuntimeError("MSPGetParam failed, error code: %d" % ret)
-        return ret, read_pointer(param_value, param_len)
+        return read_charp_with_len(param_value, param_len)
     
     def GetVersion(self, ver_name):
         if type(ver_name) is not bytes:
@@ -88,7 +85,7 @@ class MSP_CMN(object):
         ret = self.dll.MSPGetVersion(ver_name, byref(error_code))
         if MSP_SUCCESS != error_code.value:
             raise RuntimeError("MSPGetVersion failed. error code: %d" % error_code.value)
-        return error_code.value, ret.decode('utf8')
+        return ret.decode('utf8')
         
 if __name__ == '__main__':
     msp = MSP_CMN()
