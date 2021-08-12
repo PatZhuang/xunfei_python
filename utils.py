@@ -2,7 +2,7 @@ from ctypes import *
 import traceback
 
 
-def read_pointer(addr, length):
+def read_charp_with_len(addr, length):
     """将 ctypes 的 POINTER 中的内容读出, 默认为字符串类型
 
     Args:
