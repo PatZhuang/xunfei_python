@@ -7,19 +7,20 @@ from Recorder import Recorder
 import json
 
 
+msp_cmn = MSP_CMN()
+msp_cmn.Login()
+recorder = Recorder()
+ivw = QIVW(msp_cmn.dll, recorder)
+tts = QTTS(msp_cmn.dll, recorder)
+aiui_agent = AIUIAgent()
+
+
 def order(slots):
     print(slots)
+    tts.say('好的，这就为您下单。祝您用餐愉快。')
 
 
 if __name__ == '__main__':
-    msp_cmn = MSP_CMN()
-    msp_cmn.Login()
-    
-    recorder = Recorder()
-    ivw = QIVW(msp_cmn.dll, recorder)
-    tts = QTTS(msp_cmn.dll, recorder)
-    aiui_agent = AIUIAgent()
-    
     while True:
         print('ready to be waken up')
         semantic = []
