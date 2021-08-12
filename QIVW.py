@@ -7,13 +7,23 @@ import traceback
 from utils import *
 from MSP_CMN import MSP_CMN
 
+
+IVW_THRESHOLD = '0:1450,1:1450,2:1450,3:1450'   # 唤醒词序号:唤醒阈值，请根据控制台的设置自行修改
+JET_PATH = 'fo|res/ivw/wakeupresource.jet'
+
+
 class QIVW(object):
     def __init__(self, dll: CDLL, recorder: Recorder) -> None:
         super().__init__()
         self.dll = dll
         self.recorder = recorder
-        self.ivw_threshold = '0:1450,1:1450,2:1450,3:1450'
-        self.jet_path = 'fo|res/ivw/wakeupresource.jet'
+        self.ivw_threshold = IVW_THRESHOLD
+        self.jet_path = JET_PATH
+        self.begin_params = {
+            'sst': 'wakeup',
+            'ivw_threshold': self.ivw_threshold,
+            'ivw_res_path': self.jet_path
+        }
         self.sessionID = c_char_p()
         self._session_valid = False # mark if sessionID is valid
         self.awoken = False
@@ -47,18 +57,35 @@ class QIVW(object):
         self.set_res_type()
         
     def set_arg_types(self):
+        self.dll.QIVWSessionBegin.argtypes = [c_char_p, c_char_p, POINTER(c_int)]
+        self.dll.QIVWSessionEnd.argtypes = [c_char_p, c_char_p]
         self.dll.QIVWRegisterNotify.argtypes = [c_char_p, c_void_p, c_void_p]
         self.dll.QIVWAudioWrite.argtypes = [c_char_p, c_void_p, c_uint64, c_int64]
         
     def set_res_type(self):
         self.dll.QIVWSessionBegin.restype = c_char_p
         
-    def SessionBegin(self):
-        error_code = c_int64()
-        begin_params = "ivw_threshold={},sst=oneshot,ivw_res_path={},ivw_shot_word=0".format(self.ivw_threshold, self.jet_path)
-        begin_params = bytes(begin_params, encoding="utf8")
+    def SessionBegin(self, params=None):
+        """QIVWSessionBegin 的实现
+
+        Args:
+            params (dict or str, optional): params 参数. 默认使用 self.begin_params
+
+        Raises:
+            RuntimeError: QIVWSessionBegin failed.
+
+        Returns:
+            bytes: SessionID
+        """
+        if params is None:
+            params = self.begin_params
+        if type(params) is dict:
+            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+        if type(params) is str:
+            params = params.encode('utf8')
         
-        self.sessionID = self.dll.QIVWSessionBegin(None, begin_params, byref(error_code))
+        error_code = c_int()
+        self.sessionID = self.dll.QIVWSessionBegin(None, params, byref(error_code))
         if MSP_SUCCESS != error_code.value:
             raise RuntimeError("QIVWSessionBegin failed, error code %d" % error_code.value)
         self._session_valid = True
