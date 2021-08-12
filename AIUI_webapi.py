@@ -40,6 +40,16 @@ class AIUIAgent(object):
         print('AIUI webapi agent initialized.')
 
     def buildHeader(self, data_type, result_level='plain', pers_param=None):
+        """构造 HTTP Request Header, 具体参数含义参考官方文档
+
+        Args:
+            data_type (str):  数据类型, 可选值: text, audio
+            result_level (str, optional): 结果级别, 可选值: plain, complete. Defaults to 'plain'.
+            pers_param ([type], optional): 个性化参数. Defaults to None.
+
+        Returns:
+             dict: HTTP Request Heaader
+        """
         curTime = str(int(time.time()))
         param = {
             "result_level": result_level,
@@ -74,6 +84,15 @@ class AIUIAgent(object):
         return data
     
     def sendMessage(self, data_type, data):
+        """调用 WEB API 接口发送消息
+
+        Args:
+            data_type (str): 数据类型,可选值: text, audio
+            data (str/bytes): 如果 data_type 是 text, 输入文本, 如果是 audio, 输入音频数据(bytes)
+
+        Returns:
+            [type]: [description]
+        """
         if data_type == 'text':
             data = data.encode('utf8')
         return requests.post(URL, headers=self.buildHeader(data_type=data_type), data=data)

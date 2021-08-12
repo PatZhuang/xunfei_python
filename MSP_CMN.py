@@ -4,7 +4,7 @@ from MSP_TYPES import *
 from rich import print
 import traceback
 
-MSC_LOAD_LIBRARY = "../sdk/libs/x64/libmsc.so"
+MSC_LOAD_LIBRARY = "libs/x64/libmsc.so"
 APP_ID = 'a1500789'
 
 class MSP_CMN(object):
@@ -46,7 +46,6 @@ class MSP_CMN(object):
         if MSP_SUCCESS != ret:
             raise RuntimeError("MSPGetParam failed, error code: %d" % ret)
         return read_pointer(param_value, param_len)
-    
     
     def GetVersion(self, ver_name):
         pass

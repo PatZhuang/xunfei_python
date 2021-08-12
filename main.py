@@ -23,8 +23,8 @@ if __name__ == '__main__':
     while True:
         print('ready to be waken up')
         semantic = []
-        if ivw.wakeup():
-            tts.say()
+        if ivw.wakeup():    # 唤醒
+            tts.say()       # 说欢迎语
             print('done greeting.')
             service = None
             while True:

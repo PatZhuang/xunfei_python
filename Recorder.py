@@ -130,6 +130,14 @@ class Recorder(object):
         return frames, has_spoken
     
     def play_file(self, filename):
+        """播放来自文件的内容
+
+        Args:
+            filename (str): 文件名
+
+        Raises:
+            sd.CallbackStop: 停止播放的回调
+        """
         event = threading.Event()
         current_frame = 0
         data, fs = sf.read(filename, always_2d=True)
@@ -151,6 +159,14 @@ class Recorder(object):
             event.wait()
         
     def play_buffer(self, buffer):
+        """播放内存中的数据
+
+        Args:
+            buffer (bytes): 要播放的数据, 存放在内存中
+
+        Raises:
+            sd.CallbackStop: 停止播放的回调
+        """
         event = threading.Event()
         
         current_frame = 0
