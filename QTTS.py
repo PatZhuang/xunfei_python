@@ -1,5 +1,6 @@
 from ctypes import *
-import threading
+from os import EX_CONFIG
+from threading import setprofile
 from Recorder import Recorder
 from MSP_TYPES import *
 from rich import print
@@ -8,77 +9,110 @@ from utils import *
 from MSP_CMN import MSP_CMN
 
 
+VOICE_NAME = 'xiaoyan'
+PUREXTTS_RES_PATH = "fo|res/xtts/{}.jet;fo|res/xtts/common.jet".format(VOICE_NAME)
+TTS_RES_PATH = "fo|res/tts/{}.jet;fo|res/tts/common.jet".format(VOICE_NAME)
+
 class QTTS(object):
     def __init__(self, dll: CDLL, recorder: Recorder):
         super().__init__()
         self.dll = dll
         self.recorder = recorder
 
-        self._session_avail = False
+        self._session_valid = False
         self.sessionID = c_void_p()
+        self.begin_params = {               # U 通用, L 离线, O 在线
+            'engine_type':  'purextts',     # U 引擎类型: purextts, local, cloud
+            'voice_name':   VOICE_NAME,     # U 发言人
+            'speed':        50,             # U 语速
+            'volumn':       50,             # U 音量
+            'pitch':        50,             # U 语调
+            'tts_res_path': PUREXTTS_RES_PATH,   # L 合成资源路径
+            'rdn':          0,              # U 数字发音
+            'rcn':          1,              # L 1 的中文发音
+            'text_encoding':    'UTF8',     # U 合成文本编码格式
+            'sample_rate':  16000,          # U 合成音频采样率
+            'background_sound': 0,          # O 合成音频中的背景音
+            'aue':          'speex-wb;7',   # O 音频编码格式和压缩等级
+            'ttp':          'text',         # O 文本类型
+            'speed_increase':   1,          # L 语速增强
+            'effect':       0               # L 合成音效
+        }
         
         self.set_arg_types()
         self.set_res_type()
         
     def set_arg_types(self):
+        self.dll.QTTSSessionBegin.argtypes = [c_char_p, POINTER(c_int)]
+        self.dll.QTTSTextPut.argtypes = [c_char_p, c_char_p, c_uint, c_char_p]
+        self.dll.QTTSAudioGet.argtypes = [c_char_p, POINTER(c_uint), POINTER(c_int), POINTER(c_int)]
+        self.dll.QTTSSessionEnd.argtypes = [c_char_p, c_char_p]
         self.dll.QTTSGetParam.argtypes = [c_char_p, c_char_p, c_char_p, POINTER(c_int)]
         
     def set_res_type(self):
         self.dll.QTTSSessionBegin.restype = c_char_p
         self.dll.QTTSAudioGet.restype = c_void_p
 
-    def SessionBegin(self, engine_type="purextts", voice_name="xiaoyan", 
-                     speed=50, volumn=50, pitch=50, rdn=0, rcn=0, 
-                     text_encoding="UTF8", sample_rate=16000, background_sound=0,
-                     aue="speex-wb;7", ttp="text", speed_increase=1, effect=0):
+    def SessionBegin(self, params=None):
+        """QTTSSessionBegin 的实现
 
-        beginParams = "engine_type={},voice_name={},speed={},volumn={},pitch={},rdn={},text_encoding={},sample_rate={},".format(
-                engine_type, voice_name,speed, volumn, pitch, rdn, text_encoding, sample_rate
-            )
-  
-        if engine_type == "cloud":
-            beginParams += "background_sound={},aue={},ttp={}".format(background_sound, aue, ttp)
-        else:
-            if engine_type == "purextts":
-                tts_res_path = "fo|res/xtts/{}.jet;fo|res/xtts/common.jet".format(voice_name)
-            elif engine_type == "local":
-                tts_res_path = "fo|res/tts/{}.jet;fo|res/tts/common.jet".format(voice_name)
-            beginParams += "tts_res_path={},rcn={},speed_increase={},effect={}".format(
-                tts_res_path, rcn, speed_increase, effect
-                )
-        beginParams = bytes(beginParams, encoding="utf8")
-        errorCode = c_int64()
+        Args:
+            params (dict or str, optional): QTTSSessionBegin 的参数. 可以传入字典或字符串，默认使用 self.begin_params
+
+        Raises:
+            RuntimeError: SessionBegin failed.
+
+        Returns:
+            bytes: sessionID
+        """
+        if not params:
+            params = self.begin_params
+        if type(params) is dict:
+            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+        begin_params = params.encode('utf8')
+        error_code = c_int()
         
-        self.sessionID = self.dll.QTTSSessionBegin(beginParams, byref(errorCode))
-        if MSP_SUCCESS != errorCode.value:
-            raise RuntimeError("QTTSSessionBegin failed, error code: %d" % errorCode.value)
-        self._session_avail = True
+        self.sessionID = self.dll.QTTSSessionBegin(begin_params, byref(error_code))
+        if MSP_SUCCESS != error_code.value:
+            raise RuntimeError("QTTSSessionBegin failed, error code: %d" % error_code.value)
+        self._session_valid = True
         
         return self.sessionID
 
-    def TextPut(self, textString=None):
-        if textString is None:
-            textString = "您好，我是迎宾机器人花生，请问您有什么需要？"
-        textString = bytes(textString, encoding='utf8')
-        textLen = self.dll.strlen(textString)
-        ret = self.dll.QTTSTextPut(self.sessionID, textString, textLen, None)
+    def TextPut(self, text_string=None):
+        """QTTSTextPut 的实现.
+
+        Args:
+            text_string (str, optional): 需要合成的文本. Defaults to None.
+
+        Raises:
+            RuntimeError: QTTSTextPut failed
+        """
+        if text_string is None:
+            text_string = "您好，我是花生。"
+        text_string = bytes(text_string, encoding='utf8')
+        text_len = self.dll.strlen(text_string)
+        ret = self.dll.QTTSTextPut(self.sessionID, text_string, text_len, None)
         if MSP_SUCCESS != ret:
             raise RuntimeError("QTTSTextPut failed, error code: %d" % ret)
-        
-        return ret
 
     def AudioGet(self):
-        audioLen = c_uint()
-        synthStatus = c_int64()
-        errorCode = c_int64()
+        """QTTSAudioGet 的实现。不同于官方实现，该函数会获取完整的合成音频并一起返回。
+
+        Returns:
+            bytes: 完整的合成音频 (此时 synth_status 为 MSP_TTS_FLAG_DATA_END)
+        """
+        audio_len = c_uint()
+        synth_status = c_int()
+        error_code = c_int()
         data = c_void_p()
         
         frames = []
         while True:
-            data = self.dll.QTTSAudioGet(self.sessionID, byref(audioLen), byref(synthStatus), byref(errorCode))
+            data = self.dll.QTTSAudioGet(self.sessionID, byref(audio_len), byref(synth_status), byref(error_code))
             if data is not None:
-                frames.append(read_pointer(data, audioLen).raw)
-            if MSP_TTS_FLAG_DATA_END == synthStatus.value:
+                frames.append(read_charp_with_len(data, audio_len).raw)
+            if MSP_TTS_FLAG_DATA_END == synth_status.value:
                 break
         return b''.join(frames)
             
@@ -89,36 +123,37 @@ class QTTS(object):
         if MSP_SUCCESS != ret:
             raise RuntimeError("QTTSSessionEnd failed, errCode: %d" % ret)
         self.sessionID = c_void_p()
-        self._session_avail = False
+        self._session_valid = False
 
-    def GetParam(self, paramName=None):
+    def GetParam(self, param_name=None):
         # NOT WORKING!!!
-        assert paramName in ["sid", "upflow", "downflow", "ced"], "Wrong paramName"
+        assert param_name in ["sid", "upflow", "downflow", "ced"], "Wrong paramName"
         
-        paramName = bytes(paramName, encoding="utf8")
-        paramValue = (c_char * 32)()
+        param_name = bytes(param_name, encoding="utf8")
+        param_value = (c_char * 32)()
         valueLen = c_int(32)
         
-        ret = self.dll.QTTSGetParam(self.sessionID, paramName, paramValue, byref(valueLen))
+        ret = self.dll.QTTSGetParam(self.sessionID, param_name, param_value, byref(valueLen))
 
         if MSP_SUCCESS != ret:
             raise RuntimeError("QTTSGetParam failed, error code: %d" % ret)
-        return paramValue
+        return param_value
 
-    def debug(self, textString=None):
+    def debug(self, text_string=None):
         try:
             self.SessionBegin()
-            self.TextPut(textString)
+            self.TextPut(text_string)
             audio = self.AudioGet()
             self.recorder.play_buffer(audio)
             self.SessionEnd()
+            print('Done play')
         except (RuntimeError, ValueError) as e:
             traceback.print_exc()
             
-    def say(self, textString=None, block=True):
+    def say(self, text_string=None, block=True):
         try:
             self.SessionBegin()
-            self.TextPut(textString)
+            self.TextPut(text_string)
             if block:   # 阻塞交互，半双工
                 self.recorder.abort()
                 audio = self.AudioGet()
@@ -129,9 +164,8 @@ class QTTS(object):
         except (RuntimeError, ValueError) as e:
             traceback.print_exc()
         
-    
     def __del__(self):
-        if self._session_avail:
+        if self._session_valid:
             try:
                 self.SessionEnd()
             except RuntimeError as e:
