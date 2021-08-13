@@ -157,6 +157,7 @@ class QIVW(object):
                 audioData = self.recorder.get_record_audio()
                 audioLen = len(audioData)
                 self.AudioWrite(audioData)
+            self.recorder.play_file('resources/wakeup.wav')
             self.awoken = False
             
             self.SessionEnd()

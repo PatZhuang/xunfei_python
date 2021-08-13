@@ -25,8 +25,6 @@ if __name__ == '__main__':
         print('ready to be waken up')
         semantic = []
         if ivw.wakeup():    # 唤醒
-            tts.say()       # 说欢迎语
-            print('done greeting.')
             service = None
             while True:
                 recorder.abort()
@@ -41,7 +39,6 @@ if __name__ == '__main__':
                         service = nlp_res['intent']['service'].split('.')[-1]
                         if service == 'peanut_daily' and not nlp_res['intent']['shouldEndSession']:
                             semantic = nlp_res['intent']['semantic']
-                            # print(semantic[0]['slots'])
                     except:
                         if service == 'peanut_daily':   # 如果识别出错但是处于点餐阶段，默认回复是的
                             ret = aiui_agent.sendMessage(data_type="text", data="是的")
@@ -49,14 +46,13 @@ if __name__ == '__main__':
                             nlp_res = list(filter(lambda x:x['sub'] == 'nlp', ret_data))[0]
                             answer = nlp_res['intent']['answer']['text']
                             service = None
-                            order(semantic[0]['slots'])
+                            # order(semantic[0]['slots'])
                         else:
                             service = None
                             answer = "我没有听懂，可以请您再说一遍吗？"
                             print(ret_data)
                     finally:
-                        # print(ret_data)
-                        print(answer)
+                        print(ret_data)
                 else:
                     if service == 'peanut_daily':
                         # 如果没有输入音频但是处于点餐阶段，默认回复是的
@@ -65,7 +61,7 @@ if __name__ == '__main__':
                         nlp_res = list(filter(lambda x:x['sub'] == 'nlp', ret_data))[0]
                         answer = nlp_res['intent']['answer']['text']
                         service = None
-                        order(semantic[0]['slots'])
+                        # order(semantic[0]['slots'])
                     else:
                         print('no audio input')
                         break
@@ -73,6 +69,7 @@ if __name__ == '__main__':
                 tts.say(answer)
                 
             print('end session')
+            recorder.play_file('resources/sleep.wav')
             
             
         
