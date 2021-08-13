@@ -286,8 +286,6 @@ class QISR(object):
         if MSP_SUCCESS != ret:
             raise RuntimeError("QISRAudioWrite failed, error code: %d" % ret)
         
-        time.sleep(0.1)   # 实测这里需要 sleep 0.1 秒才能让 rslt_status 的结果正常，但这会导致程序有延迟
-        print(ep_status, rslt_status)
         return ep_status, rslt_status
     
     def GetResult(self):
@@ -357,11 +355,9 @@ class QISR(object):
             total_audio_data += audio_data
             
             ep_status, rstl_status = self.AudioWrite(audio_data, audio_status)
-            # print(ep_status, rstl_status)
             if MSP_EP_AFTER_SPEECH == ep_status.value:
                 break
         ep_status, rstl_status = self.AudioWrite(None, MSP_AUDIO_SAMPLE_LAST)
-        print(ep_status, rstl_status)
         if MSP_REC_STATUS_SUCCESS == rstl_status.value:
             print('识别成功, 获取结果中...')
         total_result = self.GetTotalResult(result_type=result_type)
