@@ -52,7 +52,7 @@ class QIVW(object):
             # 标记为已被唤醒
             self.awoken = True
                 
-        self.pIVWCallbackFunc = py_ivw_callback
+        self.ivw_cb = py_ivw_callback
         self.set_arg_types()
         self.set_res_type()
         
@@ -66,7 +66,7 @@ class QIVW(object):
         self.dll.QIVWSessionBegin.restype = c_char_p
         
     def SessionBegin(self, params=None):
-        """QIVWSessionBegin 的实现
+        """QIVWSessionBegin, 唤醒功能，并在参数中指定唤醒(唤醒+识别时)用到的语法列表，本次唤醒所用的参数等。
 
         Args:
             params (dict or str, optional): params 参数. 默认使用 self.begin_params
@@ -75,7 +75,7 @@ class QIVW(object):
             RuntimeError: QIVWSessionBegin failed.
 
         Returns:
-            bytes: SessionID
+            str: SessionID
         """
         if params is None:
             params = self.begin_params
@@ -89,24 +89,52 @@ class QIVW(object):
         if MSP_SUCCESS != error_code.value:
             raise RuntimeError("QIVWSessionBegin failed, error code %d" % error_code.value)
         self._session_valid = True
-        return self.sessionID
+        return self.sessionID.decode('utf8')
         
     def RegisterNotify(self, sessionID=None, msg_proc_cb=None, user_data=None):
+        """QIVWRegisterNotify, 注册回调。
+
+        Args:
+            sessionID (bytes, optional): sessionID. 默认使用 self.sessionID
+            msg_proc_cb (c_void_p, optional): 回调函数. 默认使用 self.ivw_cb
+            user_data (UserData, optional): 用户数据. Defaults to None.
+
+        Raises:
+            RuntimeError: [description]
+        """
         if not sessionID:
             sessionID = self.sessionID
         assert sessionID is not None, 'SessionID is None'
         if not msg_proc_cb:
-            msg_proc_cb = self.pIVWCallbackFunc
+            msg_proc_cb = self.ivw_cb
         ret = self.dll.QIVWRegisterNotify(sessionID, msg_proc_cb, user_data)
         if MSP_SUCCESS != ret:
             raise RuntimeError("QIVWRegisterNotify failed, error code: %d" % ret)
         
-    def AudioWrite(self, audioData, audioLen, audio_status=2):
-        ret = self.dll.QIVWAudioWrite(self.sessionID, audioData, audioLen, audio_status)
+    def AudioWrite(self, audio_data, audio_status=2):
+        """QIVWAudioWrite, 写入本次唤醒的音频，本接口需要反复调用直到音频写完为止。
+
+        Args:
+            audioData (bytes): 要写入的音频数据
+            audio_status (int, optional): 用来告知MSC音频发送是否完成. Defaults to 2.
+
+        Raises:
+            RuntimeError: [description]
+        """
+        audio_len = len(audio_data)        
+        ret = self.dll.QIVWAudioWrite(self.sessionID, audio_data, audio_len, audio_status)
         if MSP_SUCCESS != ret:
             raise RuntimeError("QIVWAudioWrite failed, errCode: %d", ret)
         
     def SessionEnd(self, hints="Done wakeup"):
+        """QIVWSessionEnd, 结束本次语音唤醒。
+
+        Args:
+            hints (str, optional): 结束本次语音唤醒的原因描述，为用户自定义内容. Defaults to "Done wakeup".
+
+        Raises:
+            RuntimeError: QIVWSessionEnd failed
+        """
         if type(hints) is str:
             hints = hints.encode('utf8')
         ret = self.dll.QIVWSessionEnd(self.sessionID, hints)
@@ -128,7 +156,7 @@ class QIVW(object):
             while not self.awoken:
                 audioData = self.recorder.get_record_audio()
                 audioLen = len(audioData)
-                self.AudioWrite(audioData, audioLen)
+                self.AudioWrite(audioData)
             self.awoken = False
             
             self.SessionEnd()

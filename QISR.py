@@ -32,11 +32,8 @@ class QISR(object):
         self.asr_res_path = asr_res_path
         self.grm_build_path = grm_build_path
         self.grm_file = grm_file
-        
-        self.sessionID_local = c_void_p()
-        self.sessionID_cloud = c_void_p()
-        self._session_valid_local = False
-        self._session_valid_cloud = False
+        self.sessionID = c_char_p()
+        self._session_valid = False
         
         self.asr_data = UserData()
         memset(addressof(self.asr_data), 0, sizeof(self.asr_data))
@@ -146,7 +143,7 @@ class QISR(object):
         self.dll.QISRGetResult.restype = c_char_p
     
     def SessionBegin(self, params=None):
-        """QISRSessionBegin
+        """QISRSessionBegin, 开始一次语音识别。
 
         Args:
             params (dict or str, optional): SessionBegin 所需的参数. 默认使用 self.begin_params.
@@ -172,10 +169,10 @@ class QISR(object):
         return self.sessionID
 
     def SessionEnd(self, hints="End session"):
-        """QISRSessionEnd
+        """QISRSessionEnd, 结束本次语音识别。
 
         Args:
-            hints (str, optional): EndSession 的 hints 参数. Defaults to "End session".
+            hints (str, optional): 结束本次语音识别的原因描述，为用户自定义内容. Defaults to "End session".
 
         Raises:
             RuntimeError: QISREndSession failed.
@@ -189,7 +186,7 @@ class QISR(object):
         self._session_valid = False
     
     def BuildGrammar(self, grammar_type='bnf', grammar_content=None, params=None, callback=None):
-        """QISRBuildGrammar
+        """QISRBuildGrammar, 构建语法，生成语法ID。
 
         Args:
             grammar_type (str, optional): grammarType. Defaults to 'bnf'.
@@ -232,7 +229,7 @@ class QISR(object):
         return self.asr_data
     
     def UpdateLexicon(self, lex_name, lex_content, params=None, callback=None):
-        """QISRUpdateLexicon
+        """QISRUpdateLexicon, 更新本地语法词典。
 
         Args:
             lex_name (str): lexiconName, 词典名称
@@ -266,7 +263,7 @@ class QISR(object):
         return self.asr_data
     
     def AudioWrite(self, audio_data, audio_status):
-        """QISRAudioWrite
+        """QISRAudioWrite, 写入本次识别的音频。
 
         Args:
             audio_data (bytes or None): 音频字节流或 None
@@ -294,7 +291,7 @@ class QISR(object):
         return ep_status, rslt_status
     
     def GetResult(self):
-        """QISRGetResult
+        """QISRGetResult, 获取识别结果。
 
         Raises:
             RuntimeError: QISRGetResult failed

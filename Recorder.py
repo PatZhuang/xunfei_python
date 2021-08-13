@@ -23,13 +23,11 @@ class Recorder(object):
                                          channels=self.channels,
                                          latency=0.1)
         print("Recorder initialized")
-        self.start()
     
     def start(self):
         if self.istream.stopped:
             self.istream.start()
-            while not self.istream.active:
-                print("* start recording")
+            print("* start recording")
         
     def stop(self):
         if self.istream.active:
@@ -45,13 +43,12 @@ class Recorder(object):
         """获取固定时长的输入音频
 
         Args:
-            duration (int, optional): 音频输入时长，单位为毫秒. 不能小于 chunk. Defaults to 1000.
+            duration (int, optional): 音频输入时长，单位为毫秒.. Defaults to 1000.
 
         Returns:
             bytes: raw 格式的输入音频
         """
-        if self.istream.stopped:
-            self.start()
+        self.start()
             
         length = duration // 1000 * self.sample_rate
         frames = []
@@ -89,8 +86,7 @@ class Recorder(object):
         Returns:
             (bytes, bool): (raw 格式的输入音频, 是否有输入音频)
         """
-        if self.istream.stopped:
-            self.start()
+        self.start()
         vad = webrtcvad.Vad(aggressiveness)
         bos_cnt = 0
         eos_cnt = 0
@@ -126,7 +122,7 @@ class Recorder(object):
                         suf_blank_len *= 2
                     frames = frames[pre_blank_len:-suf_blank_len]
                 break
-        self.istream.abort()
+        self.abort()
         return frames, has_spoken
     
     def play_file(self, filename):
@@ -188,7 +184,6 @@ class Recorder(object):
         with ostream:
             event.wait()
         return 
-        
         
     def __del__(self):
         self.istream.stop()

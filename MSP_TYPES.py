@@ -1,4 +1,6 @@
-# 状态值
+# 宏定义变量
+SAMPLE_RATE_8K      = 8000
+SAMPLE_RATE_16K     = 16000
 
 # ret code
 MSP_SUCCESS             = 0 # 通用成功标记

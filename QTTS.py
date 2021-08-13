@@ -52,9 +52,10 @@ class QTTS(object):
     def set_res_type(self):
         self.dll.QTTSSessionBegin.restype = c_char_p
         self.dll.QTTSAudioGet.restype = c_void_p
+        self.dll.QTTSGetParam.restype = c_char_p
 
     def SessionBegin(self, params=None):
-        """QTTSSessionBegin 的实现
+        """QTTSSessionBegin, 开始一次语音合成，分配语音合成资源。
 
         Args:
             params (dict or str, optional): QTTSSessionBegin 的参数. 可以传入字典或字符串，默认使用 self.begin_params
@@ -80,7 +81,7 @@ class QTTS(object):
         return self.sessionID
 
     def TextPut(self, text_string=None):
-        """QTTSTextPut 的实现.
+        """QTTSTextPut, 写入要合成的文本。
 
         Args:
             text_string (str, optional): 需要合成的文本. Defaults to None.
@@ -97,7 +98,7 @@ class QTTS(object):
             raise RuntimeError("QTTSTextPut failed, error code: %d" % ret)
 
     def AudioGet(self):
-        """QTTSAudioGet 的实现。不同于官方实现，该函数会获取完整的合成音频并一起返回。
+        """QTTSAudioGet, 获取合成音频。不同于官方实现，该函数会获取完整的合成音频并一起返回。
 
         Returns:
             bytes: 完整的合成音频 (此时 synth_status 为 MSP_TTS_FLAG_DATA_END)
@@ -117,6 +118,11 @@ class QTTS(object):
         return b''.join(frames)
             
     def SessionEnd(self):
+        """QTTSSessionEnd, 结束本次语音合成。
+
+        Raises:
+            RuntimeError: QTTSSessionEnd failed
+        """
         hints = "Done TTS"
         hints = bytes(hints, encoding="utf8")
         ret = self.dll.QTTSSessionEnd(self.sessionID, hints)
@@ -126,6 +132,17 @@ class QTTS(object):
         self._session_valid = False
 
     def GetParam(self, param_name=None):
+        """QTTSGetparam, 获取当前语音合成信息，如当前合成音频对应文本结束位置、上行流量、下行流量等。
+
+        Args:
+            param_name (str, optional): paramName 参数名. Defaults to None.
+
+        Raises:
+            RuntimeError: QTTSGetparam failed
+            
+        Returns:
+            str: 参数值
+        """
         # NOT WORKING!!!
         assert param_name in ["sid", "upflow", "downflow", "ced"], "Wrong paramName"
         
@@ -137,20 +154,15 @@ class QTTS(object):
 
         if MSP_SUCCESS != ret:
             raise RuntimeError("QTTSGetParam failed, error code: %d" % ret)
-        return param_value
-
-    def debug(self, text_string=None):
-        try:
-            self.SessionBegin()
-            self.TextPut(text_string)
-            audio = self.AudioGet()
-            self.recorder.play_buffer(audio)
-            self.SessionEnd()
-            print('Done play')
-        except (RuntimeError, ValueError) as e:
-            traceback.print_exc()
+        return param_value.decode('utf8')
             
     def say(self, text_string=None, block=True):
+        """执行一次语音合成并通过扬声器播放合成音频
+
+        Args:
+            text_string (str, optional): 要合成的文本. Defaults to None.
+            block (bool, optional): 播放音频时是否阻塞交互. Defaults to True.
+        """
         try:
             self.SessionBegin()
             self.TextPut(text_string)
@@ -159,6 +171,7 @@ class QTTS(object):
                 audio = self.AudioGet()
                 self.recorder.play_buffer(audio)
             else:
+                # 全双工交互暂未实现
                 pass    
             self.SessionEnd()
         except (RuntimeError, ValueError) as e:
@@ -178,4 +191,4 @@ if __name__ == '__main__':
     
     recorder = Recorder()
     tts = QTTS(msp_cmn.dll, recorder)
-    tts.debug()
+    tts.say()
