@@ -3,8 +3,6 @@ from Recorder import Recorder
 from MSP_CMN import MSP_CMN
 from MSP_TYPES import *
 from rich import print
-import traceback
-import os
 from utils import *
 import time
 import json
@@ -15,9 +13,6 @@ ASR_RES_PATH        = "fo|res/asr/common.jet";  # 离线语法识别资源路径
 GRM_BUILD_PATH      = "res/asr/GrmBuild";       # 构建离线语法识别网络生成数据保存路径
 GRM_FILE            = "coffeebar.bnf";          # 构建离线识别语法网络所用的语法文件
 MAX_GRAMMARID_LEN   = 32
-
-SAMPLE_RATE_8K      = 8000
-SAMPLE_RATE_16K     = 16000
 
 
 class UserData(Structure):
@@ -40,15 +35,15 @@ class QISR(object):
         
         self.sessionID_local = c_void_p()
         self.sessionID_cloud = c_void_p()
-        self._session_local_avail = False
-        self._session_cloud_avail = False
+        self._session_valid_local = False
+        self._session_valid_cloud = False
+        
         self.asr_data = UserData()
-        self.ring = 0
         memset(addressof(self.asr_data), 0, sizeof(self.asr_data))
         
         # callback functions
         @CFUNCTYPE(c_int, c_int, c_char_p, c_void_p)
-        def GrammarCallBack(error_code, info, user_data):
+        def BuildGrammarCallBack(error_code, info, user_data):
             #typedef int ( GrammarCallBack)(int errorCode, const char info, void* userData);
             grm_data = UserData.from_address(user_data)
             
@@ -64,7 +59,7 @@ class QISR(object):
                 print("构建语法失败, error code: %d" % error_code)
                 return 0
  
-        self.pGrammarCallBackFunc = GrammarCallBack
+        self.build_grammar_cb = BuildGrammarCallBack
         
         @CFUNCTYPE(c_int, c_int, c_char_p, c_void_p)
         def UpdateLexiconCallBack(errorCode, info, user_data):
@@ -82,10 +77,17 @@ class QISR(object):
             
                 return 0
         
-        self.pUpdateLexCallBackFunc = UpdateLexiconCallBack
+        self.update_lex_cb = UpdateLexiconCallBack
         
         self.set_arg_types()
         self.set_res_type()
+        
+        self.build_grm_params = {
+            'engine_type':      'local',
+            'sample_rate':      SAMPLE_RATE_16K,
+            'asr_res_path':     ASR_RES_PATH,
+            'grm_build_path':   GRM_BUILD_PATH
+        }
         
         if args.build_grammar:
             self.BuildGrammar()
@@ -95,10 +97,43 @@ class QISR(object):
                 return
             print("离线识别语法网络构建完成，开始识别...")
         elif args.local_grammar:
-            self.asr_data.grammar_id = bytes(args.local_grammar, encoding='utf8')
+            self.asr_data.grammar_id = args.local_grammar.encode('utf8')
             print("开始识别...")
         else:
-            raise RuntimeError("You should either build grammar or use existing local grammar.")
+            raise RuntimeError("Use '-bg' to build local grammar or use '-lg grammar_name' to specify existing local grammar.")
+        
+        self.begin_params = {                       # U 通用, L 离线, O 在线
+            'engine_type':      'local' if args.sr_type == 'asr' else 'cloud',      # U 引擎类型: cloud, local
+            'sub':              'asr' if args.sr_type == 'asr' else 'iat',          # O 本次识别请求的类型: iat (在线), asr (离线)
+            'language':         'zh_cn',            # O 语言: zh_cn, en_us
+            'domain':           'iat',              # O 领域
+            'accent':           'mandarin',         # O 语言区域
+            'sample_rate':      SAMPLE_RATE_16K,    # U 音频采样率
+            'asr_threshold':    0,                  # L 识别门限: 0~100
+            'asr_denoise':      1,                  # L 是否开启降噪
+            'asr_res_path':     ASR_RES_PATH,       # L 离线识别资源路径
+            'grm_build_path':   GRM_BUILD_PATH,     # L 离线语法生成路径
+            'result_type':      'json',             # U 结果格式
+            'text_encoding':    'UTF-8',            # U 参数文本编码格式
+            'local_grammar':    self.asr_data.grammar_id.decode('utf8'),    # L 离线语法 ID
+            'ptt':              1,                  # U 添加标点符号, 仅 sub=iat 时有效
+            'aue':              'speex-wb;7',       # O 音频编码格式和压缩等级
+            'result_encoding':  'UTF-8',            # U 识别结果字符串编码格式
+            'vad_enable':       1,                  # U VAD 开关
+            'vad_bos':          10000,              # U 允许头部静音的最长时间, 单位为毫秒, 仅打开 VAD 时有效
+            'vad_eos':          2000                # U 允许尾部静音的最长时间, 单位为毫秒, 仅打开 VAD 时有效
+        }
+        
+        self.update_lex_params = {
+            'engine_type':      'local',            # U 引擎类型
+            'subject':          'uup',              # O 业务类型
+            'data_type':        'userword',         # O 数据类型
+            'text_encoding':    'UTF-8',            # U 文本编码格式
+            'sample_rate':      SAMPLE_RATE_16K,    # U 音频采样率
+            'asr_res_path':     ASR_RES_PATH,       # L 离线识别资源路径
+            'grm_build_parh':   GRM_BUILD_PATH,     # L 离线语法生成路径
+            'grammar_list':     self.begin_params['local_grammar']      # L 语法 ID 列表, 支持一次性更新多个语法. 格式为 id1;id2
+        }
         
     def set_arg_types(self):
         self.dll.QISRBuildGrammar.argtypes = [c_char_p, c_char_p, c_uint, c_char_p, c_void_p, POINTER(UserData)]
@@ -110,116 +145,208 @@ class QISR(object):
         self.dll.QISRSessionBegin.restype = c_char_p
         self.dll.QISRGetResult.restype = c_char_p
     
-    def SessionBeginLocal(self, result_type="json", asr_threshold=0, asr_denoise=1, vad_bos=5000, vad_eos=2000):
-        begin_params = "engine_type=local,\
-            asr_res_path={},grm_build_path={},\
-            local_grammar={},\
-            result_type={},reulst_encoding={},\
-            asr_threshold={},asr_denoise={},vad_bos={},vad_eos={}".format(self.asr_res_path, self.grm_build_path,
-                                          self.asr_data.grammar_id.decode('utf8'), result_type, "UTF-8" if result_type == 'json' else "gb2312",
-                                          asr_threshold, asr_denoise, vad_bos, vad_eos)
-        begin_params = bytes(begin_params, encoding='utf8')
+    def SessionBegin(self, params=None):
+        """QISRSessionBegin
+
+        Args:
+            params (dict or str, optional): SessionBegin 所需的参数. 默认使用 self.begin_params.
+
+        Raises:
+            RuntimeError: QISRSessionBegin failed
+
+        Returns:
+            bytes: sessionID
+        """
+        if not params:
+            params = self.begin_params
+        if type(params) is dict:
+            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+        if type(params) is str:
+            params = params.encode('utf8')
         error_code = c_int()
-        self.sessionID_local = self.dll.QISRSessionBegin(None, begin_params, byref(error_code))
+        self.sessionID = self.dll.QISRSessionBegin(None, params, byref(error_code))
         if MSP_SUCCESS != error_code.value:
             raise RuntimeError("QISRSessionBegin failed, error code: %d" % error_code.value)
+        self._session_valid = True
         
-        self._session_local_avail = True
-            
-    def SessionBeginCloud(self):
-        pass
-    
-    def _SessionEndLocal(self, hints=None):
-        hints = bytes(hints, encoding="utf8")
-        ret = self.dll.QISRSessionEnd(self.sessionID_local, hints)
+        return self.sessionID
+
+    def SessionEnd(self, hints="End session"):
+        """QISRSessionEnd
+
+        Args:
+            hints (str, optional): EndSession 的 hints 参数. Defaults to "End session".
+
+        Raises:
+            RuntimeError: QISREndSession failed.
+        """
+        if hints is not None:
+            hints = hints.encode('utf8')
+        ret = self.dll.QISRSessionEnd(self.sessionID, hints)
         if MSP_SUCCESS != ret:
             raise RuntimeError("QISRSessionEnd Error, errCode: %d" % ret)
-        self.sessionID_local = c_void_p()
-        self._session_local_avail = False
-        
-    def _SessionEndCloud(self, hints=None):
-        pass
+        self.sessionID = c_char_p()
+        self._session_valid = False
     
-    def SessionEnd(self, sessionID, hints=None):
-        if sessionID == self.sessionID_local:
-            self._SessionEndLocal(hints)
-        elif sessionID == self.sessionID_cloud:
-            self._SessionEndCloud(hints)
-        else:
-            raise ValueError('Wrong sessionID')
-    
-    def BuildGrammar(self):
+    def BuildGrammar(self, grammar_type='bnf', grammar_content=None, params=None, callback=None):
+        """QISRBuildGrammar
+
+        Args:
+            grammar_type (str, optional): grammarType. Defaults to 'bnf'.
+            grammar_content (bytes, optional): grammarContent. 默认读取 self.grm_file 中的文件内容
+            params (dict or str, optional): 参数列表. 默认使用 self.build_grm_params
+            callback (c_void_p, optional): 回调函数. 默认使用 self.build_grm_cb
+
+        Raises:
+            RuntimeError: QISRBuildGrammar failed
+
+        Returns:
+            UserData: QISRBuildGrammar 的引用参数 data
+        """
         print("构建离线识别语法网络...")
         
-        assert self.grm_file is not None, "self.grm_file 为空"
-        assert self.asr_res_path is not None, "self.asr_res_path 为空"
-        assert self.grm_build_path is not None, "self.grm_build_path 为空"
- 
-        grm_content = None
-        with open(self.grm_file, 'rb') as grm_file:
-            grm_file.seek(0, 2)
-            grm_content_len = grm_file.tell()
-            grm_file.seek(0, 0)
+        grammar_type = 'bnf'.encode('utf8') # 离线识别使用 bnf 语法
+        if grammar_content is None:
+            assert self.grm_file is not None, "grammar_content is None and no grm_file is found"
+            with open(self.grm_file, 'rb') as grm_file:
+                grm_file.seek(0, 2)
+                grammar_length = grm_file.tell()
+                grm_file.seek(0, 0)
+                grammar_content = grm_file.read(grammar_length)
+        else:
+            grammar_length = self.dll.strlen(grammar_content)
+        
+        if params is None:
+            params = self.build_grm_params
+        if type(params) is dict:
+            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+        if type(params) is str:
+            params = params.encode('utf8')
             
-            grm_content = grm_file.read(grm_content_len)
+        if callback is None:
+            callback = self.build_grammar_cb
             
-            grm_build_params = "engine_type=local,asr_res_path={},sample_rate={},grm_build_path={}".format(
-                self.asr_res_path, SAMPLE_RATE_16K, self.grm_build_path
-            )
-            grm_build_params = bytes(grm_build_params, encoding='utf8')
-            grammar_type = bytes("bnf", encoding='utf8')
-            
-            ret = self.dll.QISRBuildGrammar(grammar_type, grm_content, grm_content_len, grm_build_params, self.pGrammarCallBackFunc, byref(self.asr_data))
+        ret = self.dll.QISRBuildGrammar(grammar_type, grammar_content, grammar_length, params, callback, byref(self.asr_data))
         if MSP_SUCCESS != ret:
             raise RuntimeError("Build grammar failed, error code: %d" % ret)
-        return ret
+        return self.asr_data
     
-    def UpdateLexicon(self, lex_name=None, lex_content=None):
-        update_lex_params = "engine_type=local, text_encoding=UTF-8,\
-            asr_res_path={}, sample_rate={},\
-            grm_build_path={}, grammar_list={}".format(
-                self.asr_res_path, SAMPLE_RATE_16K, self.grm_build_path, self.asr_data.grammar_id.decode('utf8')
-            )
-        lex_name = bytes(lex_name, encoding='utf8')
-        lex_content = bytes(lex_content, encoding='utf8')
+    def UpdateLexicon(self, lex_name, lex_content, params=None, callback=None):
+        """QISRUpdateLexicon
+
+        Args:
+            lex_name (str): lexiconName, 词典名称
+            lex_content (str): lexiconContent, 词典内容
+            params (dict or str, optional): 参数列表, 默认使用 self.update_lex_params
+            callback (c_void_p, optional): 回调函数，默认使用 self.update_lex_cb
+
+        Raises:
+            RuntimeError: QISRUpdateLexicon failed
+
+        Returns:
+            UserData: QISRUpdateLexicon 的引用参数 data
+        """
+        # NOT TESTED!!!
+        lex_name = lex_name.encode('utf8')
+        lex_content = lex_content.encode('utf8')
         lex_content_len = self.dll.strlen(lex_content)
-        update_lex_params = bytes(update_lex_params, encoding='utf8')
-        return self.dll.QISRUpdateLexicon(lex_name, lex_content, lex_content_len, update_lex_params, self.pUpdateLexCallBackFunc, byref(self.asr_data))
+        
+        if params is None:
+            params = self.update_lex_params
+        if type(params) is dict:
+            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+        if type(params) is str:
+            params = params.encode('utf8')
+            
+        if callback is None:
+            callback = self.update_lex_cb
+        ret = self.dll.QISRUpdateLexicon(lex_name, lex_content, lex_content_len, params, callback, byref(self.asr_data))
+        if MSP_SUCCESS != ret:
+            raise RuntimeError("QISRUpdateLexicon failed, error code: %d" % ret)
+        return self.asr_data
     
-    def AudioWrite(self, sessionID, audio_data, audio_len, audio_status, ep_status, rec_status):
-        ret = self.dll.QISRAudioWrite(sessionID, audio_data, audio_len, audio_status, byref(ep_status), byref(rec_status))
+    def AudioWrite(self, audio_data, audio_status):
+        """QISRAudioWrite
+
+        Args:
+            audio_data (bytes or None): 音频字节流或 None
+            audio_status (int): audioStatus, 告知 MSC 音频发送是否完成
+
+        Raises:
+            RuntimeError: QISRAudioWrite failed
+
+        Returns:
+            c_int: QISRAudioWrite 的引用参数 epStatus, 表示端点检测状态
+            c_int: QISRAudioWrite 的引用淡出 rsltStatus, 表示识别器状态
+        """
+        ep_status = c_int()
+        rslt_status = c_int()
+        if audio_data is not None:
+            audio_len = len(audio_data)
+        else:
+            audio_len = 0
+        ret = self.dll.QISRAudioWrite(self.sessionID, audio_data, audio_len, audio_status, byref(ep_status), byref(rslt_status))
         if MSP_SUCCESS != ret:
             raise RuntimeError("QISRAudioWrite failed, error code: %d" % ret)
         
-        return ret
+        time.sleep(0.1)   # 实测这里需要 sleep 0.1 秒才能让 rslt_status 的结果正常，但这会导致程序有延迟
+        print(ep_status, rslt_status)
+        return ep_status, rslt_status
     
-    def GetResult(self, sessionID, result_type):
-        error_code = c_int()
-        result_status = c_int()
-        wait_time = c_int(5000)
-        total_result = ''
-        
-        while MSP_REC_STATUS_COMPLETE != result_status.value:
-            rec_result = self.dll.QISRGetResult(sessionID, byref(result_status), c_int(), byref(error_code))
-            if MSP_SUCCESS != error_code.value:
-                print("QISRGetResult failed, error code: %d" % error_code.value)
-            if type(rec_result) is bytes:
-                if result_type == 'plain':
-                    print(rec_result.decode('gb2312'))
-                elif result_type == 'json':
-                    print(json.loads(rec_result.decode('utf8')))
-                
-            time.sleep(0.2)
+    def GetResult(self):
+        """QISRGetResult
 
-    def debug(self):
-        self.run_asr(result_type='json')
+        Raises:
+            RuntimeError: QISRGetResult failed
+
+        Returns:
+            c_char_p or None: 函数执行成功且有结果，返回字符串指针，否则返回 None
+            c_int: QISRGetResult 的引用参数 rsltStatus, 表示识别器状态
+        """
+        error_code = c_int()
+        rslt_status = c_int()
+        wait_time = c_int(5000) # 保留参数, 未使用
         
-    def run_asr(self, result_type='json'):
-        self.SessionBeginLocal(result_type=result_type)
+        rec_result = self.dll.QISRGetResult(self.sessionID, byref(rslt_status), c_int(), byref(error_code))
+        if MSP_SUCCESS != error_code.value:
+            raise RuntimeError("QISRGetResult failed, error code: %d" % error_code.value)
+        return rec_result, rslt_status
+
+    def GetTotalResult(self, result_type='json'):
+        """反复调用 GetResult 直到识别结束
+
+        Args:
+            result_type (str, optional): 与 SessionBegin 时传入的 result_encoding 参数相同
+
+        Returns:
+            list: 包含 GetResult 所有结果的列表
+        """
+        total_result = []
+        status = c_int(2)
+        while MSP_REC_STATUS_COMPLETE != status.value:
+            rec_result, status = self.GetResult()
+            if rec_result is not None:
+                if result_type == 'plain':
+                    total_result.append(json.loads(rec_result.decode('gb2312')))
+                elif result_type == 'json':
+                    total_result.append(json.loads(rec_result.decode('utf8')))
+            else:
+                time.sleep(0.2)
+        return total_result
+        
+    def run_asr(self, sr_type="local", result_type='json'):
+        """执行一次识别 (离线命令词和在线识别均可)
+
+        Args:
+            sr_type(srt, optional): 识别类型, local 为离线命令词识别, cloud 为在线识别
+            result_type (str, optional): 与 SessionBegin 时传入的 result_encoding 参数相同
+
+        Returns:
+            list: GetTotalResult 的返回结果
+            bytes: 本次识别读入的完整音频流
+        """
+        self.SessionBegin()
         audio_clip_cnt = 0
-        ep_status = c_int(MSP_EP_LOOKING_FOR_SPEECH)
-        rec_status = c_int(MSP_REC_STATUS_INCOMPLETE)
-        rss_status = c_int(MSP_REC_STATUS_INCOMPLETE)
         
         total_audio_data = b''
         while True:
@@ -227,19 +354,25 @@ class QISR(object):
                 audio_status = MSP_AUDIO_SAMPLE_FIRST
             else:
                 audio_status = MSP_AUDIO_SAMPLE_CONTINUE
+            audio_clip_cnt += 1
                 
-            audio_data = self.recorder.get_record_audio(duration=200)
+            audio_data = self.recorder.get_record_audio(duration=1000)
             total_audio_data += audio_data
-            audio_len = len(audio_data)
             
-            self.AudioWrite(self.sessionID_local, audio_data, audio_len, audio_status, ep_status, rec_status)
+            ep_status, rstl_status = self.AudioWrite(audio_data, audio_status)
+            # print(ep_status, rstl_status)
             if MSP_EP_AFTER_SPEECH == ep_status.value:
                 break
-        self.AudioWrite(self.sessionID_local, c_void_p(), 0, MSP_AUDIO_SAMPLE_LAST, ep_status, rec_status)
-        self.GetResult(self.sessionID_local, result_type=result_type)
-        self.SessionEnd(self.sessionID_local, hints="Done recognizing")
-        
-        return total_audio_data
+        ep_status, rstl_status = self.AudioWrite(None, MSP_AUDIO_SAMPLE_LAST)
+        print(ep_status, rstl_status)
+        if MSP_REC_STATUS_SUCCESS == rstl_status.value:
+            print('识别成功, 获取结果中...')
+        total_result = self.GetTotalResult(result_type=result_type)
+        for res in total_result:
+            print(res)
+        self.SessionEnd(hints="Done recognizing")
+        self.recorder.play_buffer(total_audio_data)
+        return total_result, total_audio_data
         
             
 if __name__ == '__main__':
@@ -249,4 +382,4 @@ if __name__ == '__main__':
     recorder = Recorder()
 
     isr = QISR(msp_cmn.dll, recorder, ASR_RES_PATH, GRM_FILE, GRM_BUILD_PATH)
-    isr.debug()
+    isr.run_asr()
