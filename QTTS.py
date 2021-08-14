@@ -1,12 +1,11 @@
 from ctypes import *
-from os import EX_CONFIG
-from threading import setprofile
 from Recorder import Recorder
 from MSP_TYPES import *
 from rich import print
 import traceback
 from utils import *
 from MSP_CMN import MSP_CMN
+from params import args
 
 
 VOICE_NAME = 'xiaoyan'
@@ -70,7 +69,12 @@ class QTTS(object):
             params = self.begin_params
         if type(params) is dict:
             params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
-        begin_params = params.encode('utf8')
+        if type(params) is str:
+            begin_params = params.encode('utf8')
+        elif type(params) is bytes:
+            begin_params = params
+        else:
+            raise TypeError("Wrong params type.")
         error_code = c_int()
         
         self.sessionID = self.dll.QTTSSessionBegin(begin_params, byref(error_code))
@@ -91,7 +95,8 @@ class QTTS(object):
         """
         if text_string is None:
             text_string = "您好，我是花生。"
-        text_string = bytes(text_string, encoding='utf8')
+        if type(text_string) is str:
+            text_string = text_string.encode('utf8')
         text_len = self.dll.strlen(text_string)
         ret = self.dll.QTTSTextPut(self.sessionID, text_string, text_len, None)
         if MSP_SUCCESS != ret:
@@ -124,7 +129,7 @@ class QTTS(object):
             RuntimeError: QTTSSessionEnd failed
         """
         hints = "Done TTS"
-        hints = bytes(hints, encoding="utf8")
+        hints = hints.encode('utf8')
         ret = self.dll.QTTSSessionEnd(self.sessionID, hints)
         if MSP_SUCCESS != ret:
             raise RuntimeError("QTTSSessionEnd failed, errCode: %d" % ret)
@@ -146,7 +151,7 @@ class QTTS(object):
         # NOT WORKING!!!
         assert param_name in ["sid", "upflow", "downflow", "ced"], "Wrong paramName"
         
-        param_name = bytes(param_name, encoding="utf8")
+        param_name = param_name.encode('utf8')
         param_value = (c_char * 32)()
         valueLen = c_int(32)
         
@@ -191,4 +196,4 @@ if __name__ == '__main__':
     
     recorder = Recorder()
     tts = QTTS(msp_cmn.dll, recorder)
-    tts.say()
+    tts.say(text_string=args.tts_text)
