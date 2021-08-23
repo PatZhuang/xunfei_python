@@ -1,5 +1,4 @@
 from ctypes import *
-from struct import error
 from Recorder import Recorder
 from MSP_TYPES import *
 from rich import print
@@ -96,6 +95,38 @@ class QIVW(object):
         self._session_valid = True
         return self.sessionID.decode('utf8')
         
+    def SessionEnd(self, hints="Done wakeup"):
+        """QIVWSessionEnd, 结束本次语音唤醒。
+
+        Args:
+            hints (str, optional): 结束本次语音唤醒的原因描述，为用户自定义内容. Defaults to "Done wakeup".
+
+        Raises:
+            RuntimeError: QIVWSessionEnd failed
+        """
+        if type(hints) is str:
+            hints = hints.encode('utf8')
+        ret = self.dll.QIVWSessionEnd(self.sessionID, hints)
+        if MSP_SUCCESS != ret:
+            raise RuntimeError("QIVWSessionEnd Error, errCode: %d" % ret)
+        self.sessionID = c_char_p()
+        self._session_valid = False
+
+    def AudioWrite(self, audio_data, audio_status=2):
+        """QIVWAudioWrite, 写入本次唤醒的音频，本接口需要反复调用直到音频写完为止。
+
+        Args:
+            audioData (bytes): 要写入的音频数据
+            audio_status (int, optional): 用来告知MSC音频发送是否完成. Defaults to 2.
+
+        Raises:
+            RuntimeError: [description]
+        """
+        audio_len = len(audio_data)        
+        ret = self.dll.QIVWAudioWrite(self.sessionID, audio_data, audio_len, audio_status)
+        if MSP_SUCCESS != ret:
+            raise RuntimeError("QIVWAudioWrite failed, errCode: %d", ret)
+
     def RegisterNotify(self, sessionID=None, msg_proc_cb=None, user_data=None):
         """QIVWRegisterNotify, 注册回调。
 
@@ -115,38 +146,6 @@ class QIVW(object):
         ret = self.dll.QIVWRegisterNotify(sessionID, msg_proc_cb, user_data)
         if MSP_SUCCESS != ret:
             raise RuntimeError("QIVWRegisterNotify failed, error code: %d" % ret)
-        
-    def AudioWrite(self, audio_data, audio_status=2):
-        """QIVWAudioWrite, 写入本次唤醒的音频，本接口需要反复调用直到音频写完为止。
-
-        Args:
-            audioData (bytes): 要写入的音频数据
-            audio_status (int, optional): 用来告知MSC音频发送是否完成. Defaults to 2.
-
-        Raises:
-            RuntimeError: [description]
-        """
-        audio_len = len(audio_data)        
-        ret = self.dll.QIVWAudioWrite(self.sessionID, audio_data, audio_len, audio_status)
-        if MSP_SUCCESS != ret:
-            raise RuntimeError("QIVWAudioWrite failed, errCode: %d", ret)
-        
-    def SessionEnd(self, hints="Done wakeup"):
-        """QIVWSessionEnd, 结束本次语音唤醒。
-
-        Args:
-            hints (str, optional): 结束本次语音唤醒的原因描述，为用户自定义内容. Defaults to "Done wakeup".
-
-        Raises:
-            RuntimeError: QIVWSessionEnd failed
-        """
-        if type(hints) is str:
-            hints = hints.encode('utf8')
-        ret = self.dll.QIVWSessionEnd(self.sessionID, hints)
-        if MSP_SUCCESS != ret:
-            raise RuntimeError("QIVWSessionEnd Error, errCode: %d" % ret)
-        self.sessionID = c_char_p()
-        self._session_valid = False
         
     def wakeup(self):
         """一次完整的唤醒流程

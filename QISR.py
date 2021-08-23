@@ -174,6 +174,51 @@ class QISR(object):
         
         return self.sessionID
 
+    def AudioWrite(self, audio_data, audio_status):
+        """QISRAudioWrite, 写入本次识别的音频。
+
+        Args:
+            audio_data (bytes or None): 音频字节流或 None
+            audio_status (int): audioStatus, 告知 MSC 音频发送是否完成
+
+        Raises:
+            RuntimeError: QISRAudioWrite failed
+
+        Returns:
+            c_int: QISRAudioWrite 的引用参数 epStatus, 表示端点检测状态
+            c_int: QISRAudioWrite 的引用淡出 rsltStatus, 表示识别器状态
+        """
+        ep_status = c_int()
+        rslt_status = c_int()
+        if audio_data is not None:
+            audio_len = len(audio_data)
+        else:
+            audio_len = 0
+        ret = self.dll.QISRAudioWrite(self.sessionID, audio_data, audio_len, audio_status, byref(ep_status), byref(rslt_status))
+        if MSP_SUCCESS != ret:
+            raise RuntimeError("QISRAudioWrite failed, error code: %d" % ret)
+        
+        return ep_status, rslt_status
+    
+    def GetResult(self):
+        """QISRGetResult, 获取识别结果。
+
+        Raises:
+            RuntimeError: QISRGetResult failed
+
+        Returns:
+            c_char_p or None: 函数执行成功且有结果，返回字符串指针，否则返回 None
+            c_int: QISRGetResult 的引用参数 rsltStatus, 表示识别器状态
+        """
+        error_code = c_int()
+        rslt_status = c_int()
+        wait_time = c_int(5000) # 保留参数, 未使用
+        
+        rec_result = self.dll.QISRGetResult(self.sessionID, byref(rslt_status), c_int(), byref(error_code))
+        if MSP_SUCCESS != error_code.value:
+            raise RuntimeError("QISRGetResult failed, error code: %d" % error_code.value)
+        return rec_result, rslt_status
+
     def SessionEnd(self, hints="End session"):
         """QISRSessionEnd, 结束本次语音识别。
 
@@ -191,6 +236,31 @@ class QISR(object):
         self.sessionID = c_char_p()
         self._session_valid = False
     
+    def GetParam(self, param_name=None):
+        """QTTSGetparam, 获取当前语音合成信息，如当前合成音频对应文本结束位置、上行流量、下行流量等。
+
+        Args:
+            param_name (str, optional): paramName 参数名. Defaults to None.
+
+        Raises:
+            RuntimeError: QTTSGetparam failed
+            
+        Returns:
+            str: 参数值
+        """
+        # NOT WORKING!!!
+        assert param_name in ["sid", "upflow", "downflow", "volumn"], "Wrong paramName"
+        
+        param_name = param_name.encode('utf8')
+        param_value = (c_char * 32)()
+        valueLen = c_int(32)
+        
+        ret = self.dll.QTTSGetParam(self.sessionID, param_name, param_value, byref(valueLen))
+
+        if MSP_SUCCESS != ret:
+            raise RuntimeError("QISRGetParam failed, error code: %d" % ret)
+        return param_value.decode('utf8')
+
     def BuildGrammar(self, grammar_type='bnf', grammar_content=None, params=None, callback=None):
         """QISRBuildGrammar, 构建语法，生成语法ID。
 
@@ -276,51 +346,6 @@ class QISR(object):
             raise RuntimeError("QISRUpdateLexicon failed, error code: %d" % ret)
         return self.asr_data
     
-    def AudioWrite(self, audio_data, audio_status):
-        """QISRAudioWrite, 写入本次识别的音频。
-
-        Args:
-            audio_data (bytes or None): 音频字节流或 None
-            audio_status (int): audioStatus, 告知 MSC 音频发送是否完成
-
-        Raises:
-            RuntimeError: QISRAudioWrite failed
-
-        Returns:
-            c_int: QISRAudioWrite 的引用参数 epStatus, 表示端点检测状态
-            c_int: QISRAudioWrite 的引用淡出 rsltStatus, 表示识别器状态
-        """
-        ep_status = c_int()
-        rslt_status = c_int()
-        if audio_data is not None:
-            audio_len = len(audio_data)
-        else:
-            audio_len = 0
-        ret = self.dll.QISRAudioWrite(self.sessionID, audio_data, audio_len, audio_status, byref(ep_status), byref(rslt_status))
-        if MSP_SUCCESS != ret:
-            raise RuntimeError("QISRAudioWrite failed, error code: %d" % ret)
-        
-        return ep_status, rslt_status
-    
-    def GetResult(self):
-        """QISRGetResult, 获取识别结果。
-
-        Raises:
-            RuntimeError: QISRGetResult failed
-
-        Returns:
-            c_char_p or None: 函数执行成功且有结果，返回字符串指针，否则返回 None
-            c_int: QISRGetResult 的引用参数 rsltStatus, 表示识别器状态
-        """
-        error_code = c_int()
-        rslt_status = c_int()
-        wait_time = c_int(5000) # 保留参数, 未使用
-        
-        rec_result = self.dll.QISRGetResult(self.sessionID, byref(rslt_status), c_int(), byref(error_code))
-        if MSP_SUCCESS != error_code.value:
-            raise RuntimeError("QISRGetResult failed, error code: %d" % error_code.value)
-        return rec_result, rslt_status
-
     def GetTotalResult(self, result_type='json'):
         """反复调用 GetResult 直到识别结束
 
