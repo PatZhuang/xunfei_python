@@ -23,3 +23,6 @@ def read_charp_with_len(addr, length):
             raise TypeError('Wrong length type')
         
     return (c_char * length).from_address(addr)
+
+def params_str_from_dict(params):
+    return ','.join(['{}={}'.format(k, v) for k, v in params.items()])

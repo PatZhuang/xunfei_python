@@ -156,10 +156,16 @@ class QISR(object):
         """
         if not params:
             params = self.begin_params
+
         if type(params) is dict:
-            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+            params = params_str_from_dict(params)
         if type(params) is str:
             params = params.encode('utf8')
+        elif type(params) is bytes:
+            params = params
+        else:
+            raise TypeError("Wrong params type.")
+        
         error_code = c_int()
         self.sessionID = self.dll.QISRSessionBegin(None, params, byref(error_code))
         if MSP_SUCCESS != error_code.value:
@@ -216,9 +222,13 @@ class QISR(object):
         if params is None:
             params = self.build_grm_params
         if type(params) is dict:
-            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+            params = params_str_from_dict(params)
         if type(params) is str:
             params = params.encode('utf8')
+        elif type(params) is bytes:
+            params = params
+        else:
+            raise TypeError("Wrong params type.")
             
         if callback is None:
             callback = self.build_grammar_cb
@@ -251,9 +261,13 @@ class QISR(object):
         if params is None:
             params = self.update_lex_params
         if type(params) is dict:
-            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+            params = params_str_from_dict(params)
         if type(params) is str:
             params = params.encode('utf8')
+        elif type(params) is bytes:
+            params = params
+        else:
+            raise TypeError("Wrong params type.")
             
         if callback is None:
             callback = self.update_lex_cb

@@ -1,5 +1,5 @@
 from ctypes import *
-from utils import read_charp_with_len
+from utils import *
 from MSP_TYPES import *
 import json
 from rich import print
@@ -42,10 +42,16 @@ class MSP_CMN(object):
         """
         if params is None:
             params = self.login_params
+        
         if type(params) is dict:
-            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+            params = params_str_from_dict(params)
         if type(params) is str:
             params = params.encode('utf8')
+        elif type(params) is bytes:
+            params = params
+        else:
+            raise TypeError("Wrong params type.")
+
         ret = self.dll.MSPLogin(None, None, params)
         if MSP_SUCCESS != ret:
             raise RuntimeError("MSPLogin failed, error code is: %d", ret)

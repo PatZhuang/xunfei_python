@@ -67,34 +67,34 @@ class QTTS(object):
         """
         if not params:
             params = self.begin_params
+        
         if type(params) is dict:
-            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+            params = params_str_from_dict(params)
         if type(params) is str:
-            begin_params = params.encode('utf8')
+            params = params.encode('utf8')
         elif type(params) is bytes:
-            begin_params = params
+            params = params
         else:
             raise TypeError("Wrong params type.")
         error_code = c_int()
         
-        self.sessionID = self.dll.QTTSSessionBegin(begin_params, byref(error_code))
+        self.sessionID = self.dll.QTTSSessionBegin(params, byref(error_code))
         if MSP_SUCCESS != error_code.value:
             raise RuntimeError("QTTSSessionBegin failed, error code: %d" % error_code.value)
         self._session_valid = True
         
         return self.sessionID
 
-    def TextPut(self, text_string=None):
+    def TextPut(self, text_string="你好，这是一段合成语音"):
         """QTTSTextPut, 写入要合成的文本。
 
         Args:
-            text_string (str, optional): 需要合成的文本. Defaults to None.
+            text_string (str, optional): 需要合成的文本
 
         Raises:
             RuntimeError: QTTSTextPut failed
         """
-        if text_string is None:
-            text_string = "您好，我是花生。"
+        assert text_string is not None, "TextPut 输入文本为空"
         if type(text_string) is str:
             text_string = text_string.encode('utf8')
         text_len = self.dll.strlen(text_string)

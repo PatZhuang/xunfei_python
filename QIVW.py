@@ -79,10 +79,15 @@ class QIVW(object):
         """
         if params is None:
             params = self.begin_params
+
         if type(params) is dict:
-            params = ','.join(['{}={}'.format(k, v) for k, v in params.items()])
+            params = params_str_from_dict(params)
         if type(params) is str:
             params = params.encode('utf8')
+        elif type(params) is bytes:
+            params = params
+        else:
+            raise TypeError("Wrong params type.")
         
         error_code = c_int()
         self.sessionID = self.dll.QIVWSessionBegin(None, params, byref(error_code))
