@@ -1,5 +1,5 @@
 requests==2.25.1
-rich==10.7.0
+rich==10.9.0
 sounddevice==0.4.2
 soundfile==0.10.3.post1
 webrtcvad==2.0.10

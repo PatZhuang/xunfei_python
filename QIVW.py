@@ -158,9 +158,8 @@ class QIVW(object):
             self.RegisterNotify()
             self.recorder.start()
             while not self.awoken:
-                audioData = self.recorder.get_record_audio()
-                audioLen = len(audioData)
-                self.AudioWrite(audioData)
+                audio_data = self.recorder.get_record_audio()
+                self.AudioWrite(audio_data)
             self.recorder.play_file('resources/wakeup.wav')
             self.awoken = False
             
@@ -174,7 +173,11 @@ class QIVW(object):
         """连续测试唤醒
         """
         while True:
-            self.wakeup()
+            try:
+                self.wakeup()
+            except RuntimeError as e:
+                traceback.print_exc()
+                return 
             
     def __del__(self):
         if self._session_valid:
@@ -187,7 +190,7 @@ class QIVW(object):
 if __name__ == '__main__':
     msp_cmn = MSP_CMN()
     msp_cmn.Login()
-    
+
     recorder = Recorder()
     vw = QIVW(msp_cmn.dll, recorder)
     vw.debug()

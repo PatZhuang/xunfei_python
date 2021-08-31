@@ -163,4 +163,4 @@ class MSP_CMN(object):
         
 if __name__ == '__main__':
     msp = MSP_CMN()
-    print("MSPLogin: %d" % msp.Login())
+    print('MSP Login ok.')

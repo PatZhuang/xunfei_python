@@ -16,22 +16,25 @@
 
 2. 下载 Linux 平台的 [SDK](https://www.xfyun.cn/sdk/dispatcher). 本项目支持的 AI 能力有: 离线命令词识别, 离线语音合成(普通版/高品质版), 语音唤醒, 语音听写(流式版), 在线语音合成(流式版). (AIUI 基于 WebAPI, 不使用 SDK)
 
-3. 解压 SDK 到 `<xunfei_SDK>` 目录, 将其中的 `libs` 和 `msc` 文件夹软链接到本工程根目录下, 并将动态链接库复制到系统路径:
+3. 解压 SDK 到 `xunfei_SDK` 目录, 将其中的 `libs` 和 `msc` 文件夹软链接到本工程根目录下, 并将动态链接库复制到系统路径:
 
 ```bash
 cd ~
 
-# 解压 SDK, <...> 内容自行修改
-unzip <SDK>.zip -d <xunfei_SDK>
+# 下载并解压 SDK, <...> 内容自行修改
+unzip <SDK>.zip -d xunfei_SDK
 
 git clone https://github.com/PatZhuang/xunfei_python.git
 cd xunfei_python
 # 软链接
-ln -s ~/<xunfei_SDK>/msc .
-ln -s ~/<xunfei_SDK>libs .
+ln -s ~/xunfei_SDK/bin/msc .
+ln -s ~/xunfei_SDK/libs .
 # 动态链接库复制到系统路径, 以 x64 为例
-sudo cp <xunfei_SDK>/libs/x64/*.so /usr/bin
-sudo cp <xunfei_SDK>/libs/x64/*.so /usr/local/bin
+sudo cp ~/xunfei_SDK/libs/x64/*.so /usr/bin
+sudo cp ~/xunfei_SDK/libs/x64/*.so /usr/local/bin
+# 设置动态运行库查找路径, 请根据自己的终端类型和 SDK 路径自行修改, 这里以 bash 为例
+echo "export LD_LIBRARY_PATH=$HOME/Dev/xunfei_SDK/libs/x64/" >> ~/.bashrc
+source ~/.bashrc
 ```
 
 4. 修改 APPID
@@ -44,6 +47,7 @@ sudo cp <xunfei_SDK>/libs/x64/*.so /usr/local/bin
 
 ```bash
 pip install -r requirements.txt
+pip install numpy   # Recorder 需要
 ```
 
 > python 3.5 以下需要将 `rich` 库的引用全部删除 (不影响功能). 其他库的兼容性请自行测试.
@@ -55,19 +59,14 @@ AIUI 使用 WebAPI 接口而不是原生 SDK, 需要在 [AIUI 开放平台](http
 在本工程根目录新建一个 `AIUI_CMN.py 文件`, 内容根据自己的 APP 信息填写:
 
 ```python
-WEB_APPID = "xxx"   # WebAPI 平台
-API_KEY = "xxx"     # WebAPI 平台
-AUTH_ID = "xxx"
-```
-
-其中 AUTH_ID 是一个任意的 MD5 串, 可以生成一次以后固定下来. 比如用 python 生成:
-
-```python
 import hashlib
 
 md5 = hashlib.md5()
-md5.update("anything you want to hash")
-AUTH_ID = md5.hexdigest()
+md5.update(b"anything you want to hash")
+AUTH_ID = md5.hexdigest()   # AUTH_ID 是一个任意的 MD5 串, 可以生成一次以后固定下来
+
+WEB_APPID = "xxx"   # WebAPI 平台
+API_KEY = "xxx"     # WebAPI 平台
 ```
 
 ## 功能简介
