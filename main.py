@@ -5,6 +5,7 @@ from ctypes import *
 from MSP_CMN import *
 from Recorder import Recorder
 import json
+from rich import print
 
 
 msp_cmn = MSP_CMN()

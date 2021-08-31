@@ -4,6 +4,7 @@ import soundfile as sf
 import threading
 import webrtcvad
 import time
+from rich import print
 
 class Recorder(object):
     
