@@ -33,7 +33,7 @@ ln -s ~/xunfei_SDK/libs .
 sudo cp ~/xunfei_SDK/libs/x64/*.so /usr/bin
 sudo cp ~/xunfei_SDK/libs/x64/*.so /usr/local/bin
 # 设置动态运行库查找路径, 请根据自己的终端类型和 SDK 路径自行修改, 这里以 bash 为例
-echo "export LD_LIBRARY_PATH=$HOME/Dev/xunfei_SDK/libs/x64/" >> ~/.bashrc
+echo "export LD_LIBRARY_PATH=$HOME/xunfei_SDK/libs/x64/" >> ~/.bashrc
 source ~/.bashrc
 ```
 
