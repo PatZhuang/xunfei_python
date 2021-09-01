@@ -31,7 +31,7 @@ if __name__ == '__main__':
                 recorder.abort()
                 total_audio_data, has_spoken = recorder.get_record_audio_with_vad()
         
-                if total_audio_data != b'': # 输入音频不为空
+                if has_spoken: # 输入音频不为空
                     ret = aiui_agent.sendMessage(data_type="audio", data=total_audio_data)
                     ret_data = json.loads(ret.content)['data']
                     try:

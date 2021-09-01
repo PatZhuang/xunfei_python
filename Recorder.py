@@ -28,6 +28,7 @@ class Recorder(object):
     def start(self):
         if self.istream.stopped:
             self.istream.start()
+            self.get_record_audio(duration=100)
             print("* start recording")
         
     def stop(self):
@@ -142,7 +143,7 @@ class Recorder(object):
         def play_file_callback(outdata, frames, time, status):
             nonlocal current_frame
             if status:
-                print("play file status: %d" % status)
+                print("play file status: " + status)
             chunksize = min(len(data) - current_frame, frames)
             outdata[:chunksize] = data[current_frame:current_frame + chunksize]
             if chunksize < frames:
