@@ -142,8 +142,6 @@ class Recorder(object):
 
         def play_file_callback(outdata, frames, time, status):
             nonlocal current_frame
-            if status:
-                print("play file status: " + status)
             chunksize = min(len(data) - current_frame, frames)
             outdata[:chunksize] = data[current_frame:current_frame + chunksize]
             if chunksize < frames:
