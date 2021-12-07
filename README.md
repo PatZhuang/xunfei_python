@@ -27,6 +27,7 @@ unzip <SDK>.zip -d xunfei_SDK
 git clone https://github.com/PatZhuang/xunfei_python.git
 cd xunfei_python
 # 软链接
+# 假设 SDK 解压到了 ~/xunfei_SDK 请根据实际情况自行修改
 ln -s ~/xunfei_SDK/bin/msc .
 ln -s ~/xunfei_SDK/libs .
 # 动态链接库复制到系统路径, 以 x64 为例
