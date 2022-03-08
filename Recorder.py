@@ -5,6 +5,9 @@ import threading
 import webrtcvad
 import time
 from rich import print
+import io
+import numpy as np
+from scipy.io import wavfile as wf
 
 class Recorder(object):
     
@@ -191,6 +194,19 @@ class Recorder(object):
         
         print("Recorder deleted")
         return
+
+    def convert_bytearray_to_wav_ndarray(self, input_bytearray: bytes, sampling_rate=16000):
+        bytes_wav = bytes()
+        byte_io = io.BytesIO(bytes_wav)
+        wf.write(byte_io, sampling_rate, np.frombuffer(input_bytearray, dtype=np.int16))
+        output_wav = byte_io.read()
+        output, samplerate = sf.read(io.BytesIO(output_wav))
+        return output
+
+    def save_audio(self, filename, raw_audio, sample_rate=16000):
+        wav_audio = self.convert_bytearray_to_wav_ndarray(raw_audio, sampling_rate=sample_rate)
+        wf.write(filename, sample_rate, wav_audio)
+        print("Saved audio to %s" % filename)
 
 if __name__ == '__main__':
     r = Recorder()
