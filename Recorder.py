@@ -4,7 +4,6 @@ import soundfile as sf
 import threading
 import webrtcvad
 import time
-from rich import print
 import io
 import numpy as np
 from scipy.io import wavfile as wf
