@@ -161,7 +161,7 @@ class QTTS(object):
             raise RuntimeError("QTTSGetParam failed, error code: %d" % ret)
         return param_value.decode('utf8')
             
-    def say(self, text_string=None, block=True):
+    def say(self, text_string=None, block=True, file_path=None):
         """执行一次语音合成并通过扬声器播放合成音频
 
         Args:
@@ -175,6 +175,8 @@ class QTTS(object):
                 self.recorder.abort()
                 audio = self.AudioGet()
                 self.recorder.play_buffer(audio)
+                if file_path is not None:
+                    self.recorder.save_audio(file_path, audio, sample_rate=16000)
             else:
                 # 全双工交互暂未实现
                 pass    
