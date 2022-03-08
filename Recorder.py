@@ -134,6 +134,7 @@ class Recorder(object):
 
         Args:
             filename (str): 文件名
+            blocking (bool): 播放时是否阻塞
 
         Raises:
             sd.CallbackStop: 停止播放的回调
@@ -141,59 +142,20 @@ class Recorder(object):
 
         data, samplerate = sf.read(filename, always_2d=True)
         sd.play(data, samplerate=samplerate, blocking=blocking)
-
-        # event = threading.Event()
-        # current_frame = 0
-        # data, samplerate = sf.read(filename, always_2d=True)
         
-        # def play_file_callback(outdata, frames, time, status):
-        #     nonlocal current_frame
-        #     chunksize = min(len(data) - current_frame, frames)
-        #     outdata[:chunksize] = data[current_frame:current_frame + chunksize]
-        #     if chunksize < frames:
-        #         outdata[chunksize:] = 0
-        #         raise sd.CallbackStop()
-        #     current_frame += chunksize
-            
-        # ostream = sd.OutputStream(samplerate=fs, channels=data.shape[1],
-        #                             callback=play_file_callback, finished_callback=event.set)
-        # with ostream:
-        #     event.wait()
-        
-    def play_buffer(self, buffer, sample_rate=16000):
+    def play_buffer(self, buffer, sample_rate=16000, blocking=False):
         """播放内存中的数据
 
         Args:
             buffer (bytes): 要播放的数据, 存放在内存中
             sample_rate (int): 采样率
+            blocking (bool): 播放时是否阻塞
 
         Raises:
             sd.CallbackStop: 停止播放的回调
         """
         audio = self.convert_bytearray_to_wav_ndarray(buffer, sample_rate=sample_rate)
-        sd.play(audio, samplerate=sample_rate)
-
-        # event = threading.Event()
-        
-        # current_frame = 0
-        # def play_buffer_callback(outdata, frames, time, status):
-        #     nonlocal current_frame
-        #     if status:
-        #         print("play buffe status: %d" % status)
-        #     # 只考虑采样为 16bit 或 8bit 的情况
-        #     bytes = 2 if self.dtype == 'int16' else 1
-        #     chunksize = min(len(buffer) - current_frame, frames * bytes)
-        #     outdata[:chunksize] = buffer[current_frame:current_frame + chunksize]
-        #     if chunksize < frames * 2:
-        #         raise sd.CallbackStop()
-        #     current_frame += chunksize
-        
-        # ostream = sd.RawOutputStream(samplerate=self.sample_rate, blocksize=self.chunk, 
-        #                              channels=self.channels, dtype=self.dtype,
-        #                             callback=play_buffer_callback, finished_callback=event.set)
-        # with ostream:
-        #     event.wait()
-        # return 
+        sd.play(audio, samplerate=sample_rate, blocking=blocking)
         
     def __del__(self):
         self.istream.stop()
@@ -229,7 +191,7 @@ class Recorder(object):
         """
         wav_audio = self.convert_bytearray_to_wav_ndarray(raw_audio, sample_rate=sample_rate)
         wf.write(filename, sample_rate, wav_audio)
-        print("Saved audio to %s" % filename)
+        print("Save audio to %s" % filename)
 
 if __name__ == '__main__':
     r = Recorder()

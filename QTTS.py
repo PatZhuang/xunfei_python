@@ -1,4 +1,6 @@
 from ctypes import *
+
+from numpy import block
 from Recorder import Recorder
 from MSP_TYPES import *
 from rich import print
@@ -161,25 +163,22 @@ class QTTS(object):
             raise RuntimeError("QTTSGetParam failed, error code: %d" % ret)
         return param_value.decode('utf8')
             
-    def say(self, text_string=None, block=True, file_path=None):
+    def say(self, text_string=None, blocking=False, output_file_path=None):
         """执行一次语音合成并通过扬声器播放合成音频
 
         Args:
             text_string (str, optional): 要合成的文本. Defaults to None.
-            block (bool, optional): 播放音频时是否阻塞交互. Defaults to True.
+            blocking (bool, optional): 播放音频时是否阻塞交互. Defaults to True.
+            output_file_path (str, optional): 输出音频的文件名
         """
         try:
             self.SessionBegin()
             self.TextPut(text_string)
-            if block:   # 阻塞交互，半双工
-                self.recorder.abort()
-                audio = self.AudioGet()
-                self.recorder.play_buffer(audio)
-                if file_path is not None:
-                    self.recorder.save_audio(file_path, audio, sample_rate=16000)
-            else:
-                # 全双工交互暂未实现
-                pass    
+            self.recorder.abort()
+            audio = self.AudioGet()
+            self.recorder.play_buffer(audio, blocking=blocking)
+            if output_file_path is not None:
+                self.recorder.save_audio(output_file_path, audio, sample_rate=16000)
             self.SessionEnd()
         except (RuntimeError, ValueError) as e:
             traceback.print_exc()
@@ -198,4 +197,4 @@ if __name__ == '__main__':
     
     recorder = Recorder()
     tts = QTTS(msp_cmn.dll, recorder)
-    tts.say(text_string=args.tts_text, file_path=args.output_audio_file)
+    tts.say(text_string=args.tts_text, output_file_path=args.output_audio_file, blocking=True)
