@@ -198,4 +198,4 @@ if __name__ == '__main__':
     
     recorder = Recorder()
     tts = QTTS(msp_cmn.dll, recorder)
-    tts.say(text_string=args.tts_text)
+    tts.say(text_string=args.tts_text, file_path=args.output_audio_file)
