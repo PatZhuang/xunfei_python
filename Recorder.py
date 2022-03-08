@@ -195,6 +195,15 @@ class Recorder(object):
         return
 
     def convert_bytearray_to_wav_ndarray(self, input_bytearray: bytes, sampling_rate=16000):
+        """将音频流 bytes 转化为 numpy 的 ndarray
+
+        Args:
+            input_bytearray (bytes): 原始音频流
+            sampling_rate (int, optional): 采样率. Defaults to 16000.
+
+        Returns:
+            ndarray: ndarray 格式的音频流
+        """
         bytes_wav = bytes()
         byte_io = io.BytesIO(bytes_wav)
         wf.write(byte_io, sampling_rate, np.frombuffer(input_bytearray, dtype=np.int16))
@@ -203,6 +212,13 @@ class Recorder(object):
         return output
 
     def save_audio(self, filename, raw_audio, sample_rate=16000):
+        """保存音频流到指定文件中
+
+        Args:
+            filename (str): 音频文件名
+            raw_audio (bytes): 原始音频流
+            sample_rate (int, optional): 采样率. Defaults to 16000.
+        """
         wav_audio = self.convert_bytearray_to_wav_ndarray(raw_audio, sampling_rate=sample_rate)
         wf.write(filename, sample_rate, wav_audio)
         print("Saved audio to %s" % filename)
